@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
 <style>
   html, body, #map { margin: 0; height: 100%; background: #eef2f5; font-family: system-ui, sans-serif; }
-  #tip { position: absolute; pointer-events: none; display: none; z-index: 5; min-width: 210px;
+  #tip { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: none; display: none; z-index: 5; min-width: 210px;
     background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); padding: 10px 12px;
     font-size: 13px; line-height: 1.45; color: #222; border-left: 4px solid #c8102e; }
   #tip h4 { margin: 0 0 2px; font-size: 14px; }
@@ -31,6 +31,8 @@ const map = new maplibregl.Map({
   fitBoundsOptions: { padding: 20 },
   maxZoom: 14,
   minZoom: 3,
+  fadeDuration: 0,
+  renderWorldCopies: false,
   attributionControl: false
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -38,48 +40,53 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-ri
 // Niveles según zoom: región < 6, provincia 6-8, distrito >= 8
 const levelOf = z => z < 6 ? 'tb_region' : z < 8 ? 'tb_provincia' : 'tb_distrito';
 const levelName = { tb_region: 'Departamento', tb_provincia: 'Provincia', tb_distrito: 'Distrito' };
+const levelZoom = { tb_region: [0, 6], tb_provincia: [6, 8], tb_distrito: [8, 24] };
 
 map.on('load', () => {
+  // promoteId: el id_geografia pasa a ser el id de cada polígono -> resaltado con feature-state
   map.addSource('inei', { type: 'vector', tiles: [location.origin + '/tiles/{z}/{x}/{y}.pbf'],
-    scheme: 'tms', minzoom: 0, maxzoom: 12 });
+    scheme: 'tms', minzoom: 0, maxzoom: 12,
+    promoteId: { tb_region: 'id_geografia', tb_provincia: 'id_geografia', tb_distrito: 'id_geografia' } });
 
-  const fill = (id, layer, color, minz, maxz) => map.addLayer({
-    id, type: 'fill', source: 'inei', 'source-layer': layer, minzoom: minz, maxzoom: maxz,
-    paint: { 'fill-color': color, 'fill-opacity': 1 } });
-  const line = (id, layer, color, w) => map.addLayer({
-    id, type: 'line', source: 'inei', 'source-layer': layer,
+  const line = (id, layer, color, w, minzoom = 0) => map.addLayer({
+    id, type: 'line', source: 'inei', 'source-layer': layer, minzoom,
     paint: { 'line-color': color, 'line-width': w } });
 
-  fill('f-dist', 'tb_distrito', '#fbfaf6', 0, 24);
-  line('l-dist', 'tb_distrito', '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 6, 0.2, 10, 0.8]);
+  map.addLayer({ id: 'f-dist', type: 'fill', source: 'inei', 'source-layer': 'tb_distrito',
+    paint: { 'fill-color': '#fbfaf6' } });
+  line('l-dist', 'tb_distrito', '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 5, 0.2, 10, 0.8], 5);
   line('l-prov', 'tb_provincia', '#7a7466', ['interpolate', ['linear'], ['zoom'], 4, 0.4, 10, 1.6]);
   line('l-reg', 'tb_region', '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 3, 0.8, 10, 2.4]);
 
-  // resaltado del hover (uno por nivel, se filtra por id_geografia)
-  for (const [lyr, id] of [['tb_region', 'h-reg'], ['tb_provincia', 'h-prov'], ['tb_distrito', 'h-dist']]) {
-    map.addLayer({ id, type: 'fill', source: 'inei', 'source-layer': lyr,
-      filter: ['==', ['get', 'id_geografia'], -1],
-      paint: { 'fill-color': '#c8102e', 'fill-opacity': 0.35 } });
-    map.addLayer({ id: id + '-o', type: 'line', source: 'inei', 'source-layer': lyr,
-      filter: ['==', ['get', 'id_geografia'], -1],
-      paint: { 'line-color': '#c8102e', 'line-width': 2.5 } });
+  // Resaltado: una capa por nivel, visible solo en su rango de zoom.
+  // Usa feature-state (no setFilter), así el mapa no se re-procesa en cada movimiento.
+  const on = ['boolean', ['feature-state', 'hover'], false];
+  for (const lyr of Object.keys(levelName)) {
+    const [minzoom, maxzoom] = levelZoom[lyr];
+    map.addLayer({ id: 'h-' + lyr, type: 'fill', source: 'inei', 'source-layer': lyr, minzoom, maxzoom,
+      paint: { 'fill-color': '#c8102e', 'fill-opacity': ['case', on, 0.35, 0] } });
+    map.addLayer({ id: 'h-' + lyr + '-o', type: 'line', source: 'inei', 'source-layer': lyr, minzoom, maxzoom,
+      paint: { 'line-color': '#c8102e', 'line-width': ['case', on, 2.5, 0] } });
   }
 });
 
-const hoverIds = { tb_region: 'h-reg', tb_provincia: 'h-prov', tb_distrito: 'h-dist' };
+let hovered = null; // { sourceLayer, id }
 function setHighlight(layer, id) {
-  for (const [lyr, hid] of Object.entries(hoverIds)) {
-    const f = ['==', ['get', 'id_geografia'], lyr === layer ? id : -1];
-    map.setFilter(hid, f); map.setFilter(hid + '-o', f);
-  }
+  if (hovered) map.setFeatureState({ source: 'inei', ...hovered }, { hover: false });
+  hovered = id > 0 ? { sourceLayer: layer, id } : null;
+  if (hovered) map.setFeatureState({ source: 'inei', ...hovered }, { hover: true });
 }
 
 const tip = document.getElementById('tip');
 const lvl = document.getElementById('lvl');
-const cache = new Map();
-let current = null, timer = null;
 
-async function loadTip(id) {
+// Textos del tooltip: se cargan una sola vez desde datos.xlsx (vía /api/datos).
+// Si un id no está en el Excel, se pide al INEI como antes.
+let excel = {};
+fetch('/api/datos').then(r => r.json()).then(d => { excel = d; }).catch(() => {});
+const cache = new Map();
+function loadTip(id) {
+  if (excel[id]) return Promise.resolve(excel[id]);
   if (!cache.has(id)) cache.set(id, fetch('/api/tooltip?id=' + id).then(r => r.json()).then(j => j.data));
   return cache.get(id);
 }
@@ -94,43 +101,58 @@ function render(d) {
     <div class="row"><span>Densidad</span><b>${esc(d.densidad)}</b></div>`;
 }
 
-function place(e) {
+let lastPoint = null;
+function place(pt) {
   const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
-  let x = e.point.x + pad, y = e.point.y + pad;
-  if (x + w > innerWidth) x = e.point.x - w - pad;
-  if (y + h > innerHeight) y = e.point.y - h - pad;
-  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  let x = pt.x + pad, y = pt.y + pad;
+  if (x + w > innerWidth) x = pt.x - w - pad;
+  if (y + h > innerHeight) y = pt.y - h - pad;
+  tip.style.transform = `translate(${x}px, ${y}px)`;
 }
 
 map.on('zoom', () => { lvl.textContent = 'Nivel: ' + levelName[levelOf(map.getZoom())]; });
 
-map.on('mousemove', e => {
+let current = null, curLayer = null;
+function clear() {
+  tip.style.display = 'none'; setHighlight(null, -1); current = null; curLayer = null;
+  map.getCanvas().style.cursor = '';
+}
+
+function update(pt) {
   if (!map.getLayer('f-dist')) return;
   const layer = levelOf(map.getZoom());
-  const f = map.queryRenderedFeatures(e.point, { layers: ['f-dist'] });
-  // El distrito trae ccdd/ccpp, de ahí se derivan los ids de provincia y región
-  const hit = f.length ? f[0] : null;
-  if (!hit) { tip.style.display = 'none'; setHighlight(layer, -1); current = null; map.getCanvas().style.cursor = ''; return; }
+  const hit = map.queryRenderedFeatures(pt, { layers: ['f-dist'] })[0];
+  if (!hit) return clear();
   map.getCanvas().style.cursor = 'pointer';
+  // El distrito trae ccdd/ccpp, de ahí se derivan los ids de provincia y región
   // id_geografia del nivel: distrito 9xxxxxx; prov 8 + ccdd+ccpp; región 7 + ccdd
   const p = hit.properties;
   const gid = layer === 'tb_distrito' ? +p.id_geografia
             : layer === 'tb_provincia' ? +('8' + p.ccdd + p.ccpp + '00')
             : +('7' + p.cod_region + '0000');
-  if (gid !== current) {
-    current = gid;
+  if (gid !== current || layer !== curLayer) {
+    current = gid; curLayer = layer;
     setHighlight(layer, gid);
-    clearTimeout(timer);
-    timer = setTimeout(async () => {
-      try {
-        const d = await loadTip(gid);
-        if (current === gid) { tip.innerHTML = render(d); tip.style.display = 'block'; place(e); }
-      } catch (_) { tip.style.display = 'none'; }
-    }, 60);
+    loadTip(gid).then(d => {
+      if (current !== gid || !d) return;
+      tip.innerHTML = render(d); tip.style.display = 'block'; place(lastPoint);
+    }).catch(() => { tip.style.display = 'none'; });
   }
-  if (tip.style.display === 'block') place(e);
-});
-map.on('mouseout', () => { tip.style.display = 'none'; current = null; });
+  if (tip.style.display === 'block') place(pt);
+}
+
+// Un solo cálculo por frame aunque el mouse dispare muchos eventos
+let pending = false;
+function schedule(pt) {
+  lastPoint = pt;
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; update(lastPoint); });
+}
+map.on('mousemove', e => schedule(e.point));
+map.on('click', e => schedule(e.point)); // en celular/tablet el toque muestra el tooltip
+map.on('mouseout', clear);
+map.on('movestart', () => { if (!matchMedia('(hover: hover)').matches) clear(); });
 </script>
 </body>
 </html>
