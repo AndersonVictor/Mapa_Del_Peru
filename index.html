@@ -16,14 +16,29 @@
   #tip .row { display: flex; justify-content: space-between; gap: 12px; }
   #lvl { position: absolute; top: 10px; left: 10px; z-index: 5; background: #fff; border-radius: 6px;
     padding: 6px 10px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.2); }
+  #aviso { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); z-index: 9; display: none;
+    max-width: min(560px, calc(100% - 32px)); background: #fff3cd; color: #5c4400; border: 1px solid #e0b84c;
+    border-radius: 8px; padding: 10px 14px; font-size: 14px; line-height: 1.5; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+  #aviso code { background: #fff; padding: 1px 5px; border-radius: 4px; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="lvl">Nivel: Departamento</div>
 <div id="tip"></div>
+<div id="aviso"></div>
+<script>
+// Si algo falla, se muestra aquí en vez de dejar la pantalla en blanco
+function aviso(html) { const a = document.getElementById('aviso'); a.innerHTML = html; a.style.display = 'block'; }
+if (location.protocol === 'file:')
+  aviso('Abriste el archivo directamente. Corre <code>python server.py</code> y entra a ' +
+        '<a href="http://localhost:8000">http://localhost:8000</a>');
+</script>
 <script src="/vendor/maplibre-gl.js"></script>
 <script>
+if (typeof maplibregl === 'undefined' && location.protocol !== 'file:')
+  aviso('No cargó la librería del mapa (<code>vendor/maplibre-gl.js</code>). Haz <code>git pull</code> ' +
+        'y revisa que exista la carpeta <code>vendor/</code> junto a server.py.');
 const map = new maplibregl.Map({
   container: 'map',
   style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#eef2f5' } }] },
@@ -44,7 +59,15 @@ const levelZoom = { tb_region: [0, 6], tb_provincia: [6, 8], tb_distrito: [8, 24
 
 map.on('load', async () => {
   // Zoom máximo descargado en cache_tiles/; más allá, MapLibre amplía esos mismos tiles
-  const { maxzoom } = await fetch('/api/config').then(r => r.json());
+  const cfg = await fetch('/api/config').then(r => r.json()).catch(() => ({}));
+  const { maxzoom } = cfg;
+  if (!cfg.tiles) aviso('No hay tiles descargados en <code>cache_tiles/</code>. Corre <code>python descargar_todo.py</code> ' +
+                        '(en la misma carpeta que server.py) y espera a que termine.');
+  else if (!cfg.tiles_con_datos) aviso('Los tiles descargados están vacíos. Borra la carpeta <code>cache_tiles</code> ' +
+                                       'y vuelve a correr <code>python descargar_todo.py</code>.');
+  else if (!cfg.excel) aviso('Falta <code>datos.xlsx</code>: el mapa se ve pero sin textos. Corre <code>python actualizar_excel.py</code>.');
+  let errores = 0;
+  map.on('error', e => { if (errores++ === 0) aviso('Error al cargar el mapa: ' + esc(e.error?.message || e.error)); });
   // promoteId: el id_geografia pasa a ser el id de cada polígono -> resaltado con feature-state
   map.addSource('inei', { type: 'vector', tiles: [location.origin + '/tiles/{z}/{x}/{y}.pbf'],
     scheme: 'tms', minzoom: 0, maxzoom: maxzoom || 10,
