@@ -35,14 +35,6 @@
   .nota { color: #777; font-size: 11px; margin-top: 4px; }
   #mapwrap { position: relative; min-height: 0; }
   #map { position: absolute; inset: 0; }
-  #tip { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: none; display: none; z-index: 5; min-width: 210px;
-    background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); padding: 10px 12px;
-    font-size: 13px; line-height: 1.45; color: #222; border-left: 4px solid #c8102e; }
-  #tip h4 { margin: 0 0 2px; font-size: 14px; }
-  #tip .amb { color: #666; font-size: 11px; margin-bottom: 6px; }
-  #tip .big { font-size: 20px; font-weight: 700; color: #c8102e; }
-  #tip .row { display: flex; justify-content: space-between; gap: 12px; }
-  #tip .bajo { color: #777; font-size: 11px; margin-top: 6px; border-top: 1px solid #eee; padding-top: 4px; }
   #aviso { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 9; display: none;
     max-width: min(520px, calc(100% - 32px)); background: #fff3cd; color: #5c4400; border: 1px solid #e0b84c;
     border-radius: 8px; padding: 10px 14px; font-size: 14px; line-height: 1.5; }
@@ -78,6 +70,7 @@
 </div>
 <script src="/vendor/maplibre-gl.js"></script>
 <script src="/filtro.js"></script>
+<script src="/tooltip.js"></script>
 <script>
 function aviso(html) { const a = document.getElementById('aviso'); a.innerHTML = html; a.style.display = 'block'; }
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -220,15 +213,6 @@ function pick(pt) {
   const gid = distIds.has(dist) ? dist : provIds.has(prov) ? prov : reg;
   return { gid, capa: Filtro.CAPA[gid[0]], dist };
 }
-function render(d, t) {
-  const title = d.nombdist || d.nombprov || d.nombregion;
-  const bajo = t.gid !== t.dist && datos[t.dist] ? `<div class="bajo">Distrito bajo el cursor: ${esc(datos[t.dist].nombdist)}</div>` : '';
-  return `<h4>${esc(title)}</h4><div class="amb">${esc(d.nombAmbito)}</div>
-    <div>${esc(d.indicador)}</div><div class="big">${esc(d.dato)}</div>
-    <div class="row"><span>Hombres</span><b>${esc(d.hombre)}</b></div>
-    <div class="row"><span>Mujeres</span><b>${esc(d.mujer)}</b></div>
-    <div class="row"><span>Densidad</span><b>${esc(d.densidad)}</b></div>${bajo}`;
-}
 function place(pt) {
   const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight, c = map.getContainer();
   let x = pt.x + pad, y = pt.y + pad;
@@ -246,7 +230,8 @@ function update(pt) {
     current = key;
     setHighlight(t.capa, +t.gid);
     const d = datos[t.gid];
-    if (d) { tip.innerHTML = render(d, t); tip.style.display = 'block'; } else tip.style.display = 'none';
+    const bajo = t.gid !== t.dist && datos[t.dist] ? `<div class="bajo">Distrito bajo el cursor: ${esc(datos[t.dist].nombdist)}</div>` : '';
+    if (d) { tip.innerHTML = tooltipHTML(d, bajo); tip.style.display = 'block'; } else tip.style.display = 'none';
   }
   if (tip.style.display === 'block') place(pt);
 }

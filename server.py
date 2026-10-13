@@ -237,13 +237,16 @@ def lista_xlsx():
     wb = Workbook()
     ws = wb.active
     ws.title = "lista"
-    ws.append(["nombre", "nivel", "departamento", "provincia"] + COLUMNAS)
+    # columnas que agregaste a datos.xlsx también salen en la descarga
+    extras = list(dict.fromkeys(c for d in datos.values() for c in d if c not in COLUMNAS and c != "nivel"))
+    ws.append(["nombre", "nivel", "departamento", "provincia"] + COLUMNAS + extras)
     for f in filas:
         if not f["en_area"]:
             continue
         d = datos.get(f["id"] or "", {})
         ws.append([f["nombre"], f["nivel"], f["departamento"], f["provincia"]] +
-                  [d.get(c, "") if c != "id_geografia" else (f["id"] or "NO ENCONTRADO") for c in COLUMNAS])
+                  [d.get(c, "") if c != "id_geografia" else (f["id"] or "NO ENCONTRADO") for c in COLUMNAS] +
+                  [d.get(c, "") for c in extras])
     for c in ws[1]:
         c.font = Font(bold=True, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor="C8102E")
@@ -256,7 +259,8 @@ def lista_xlsx():
 
 ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
              "/vendor/maplibre-gl.css": "text/css",
-             "/filtro.js": "application/javascript; charset=utf-8"}
+             "/filtro.js": "application/javascript; charset=utf-8",
+             "/tooltip.js": "application/javascript; charset=utf-8"}
 
 
 class H(BaseHTTPRequestHandler):
