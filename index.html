@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa del Perú - Censo 2025</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<style>
+  html, body, #map { margin: 0; height: 100%; background: #eef2f5; font-family: system-ui, sans-serif; }
+  #tip { position: absolute; pointer-events: none; display: none; z-index: 5; min-width: 210px;
+    background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); padding: 10px 12px;
+    font-size: 13px; line-height: 1.45; color: #222; border-left: 4px solid #c8102e; }
+  #tip h4 { margin: 0 0 2px; font-size: 14px; }
+  #tip .amb { color: #666; font-size: 11px; margin-bottom: 6px; }
+  #tip .big { font-size: 20px; font-weight: 700; color: #c8102e; }
+  #tip .row { display: flex; justify-content: space-between; gap: 12px; }
+  #lvl { position: absolute; top: 10px; left: 10px; z-index: 5; background: #fff; border-radius: 6px;
+    padding: 6px 10px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.2); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="lvl">Nivel: Departamento</div>
+<div id="tip"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script>
+const map = new maplibregl.Map({
+  container: 'map',
+  style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#eef2f5' } }] },
+  bounds: [[-81.5, -18.5], [-68.5, 0.2]],
+  fitBoundsOptions: { padding: 20 },
+  maxZoom: 14,
+  minZoom: 3,
+  attributionControl: false
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+// Niveles según zoom: región < 6, provincia 6-8, distrito >= 8
+const levelOf = z => z < 6 ? 'tb_region' : z < 8 ? 'tb_provincia' : 'tb_distrito';
+const levelName = { tb_region: 'Departamento', tb_provincia: 'Provincia', tb_distrito: 'Distrito' };
+
+map.on('load', () => {
+  map.addSource('inei', { type: 'vector', tiles: [location.origin + '/tiles/{z}/{x}/{y}.pbf'],
+    scheme: 'tms', minzoom: 0, maxzoom: 12 });
+
+  const fill = (id, layer, color, minz, maxz) => map.addLayer({
+    id, type: 'fill', source: 'inei', 'source-layer': layer, minzoom: minz, maxzoom: maxz,
+    paint: { 'fill-color': color, 'fill-opacity': 1 } });
+  const line = (id, layer, color, w) => map.addLayer({
+    id, type: 'line', source: 'inei', 'source-layer': layer,
+    paint: { 'line-color': color, 'line-width': w } });
+
+  fill('f-dist', 'tb_distrito', '#fbfaf6', 0, 24);
+  line('l-dist', 'tb_distrito', '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 6, 0.2, 10, 0.8]);
+  line('l-prov', 'tb_provincia', '#7a7466', ['interpolate', ['linear'], ['zoom'], 4, 0.4, 10, 1.6]);
+  line('l-reg', 'tb_region', '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 3, 0.8, 10, 2.4]);
+
+  // resaltado del hover (uno por nivel, se filtra por id_geografia)
+  for (const [lyr, id] of [['tb_region', 'h-reg'], ['tb_provincia', 'h-prov'], ['tb_distrito', 'h-dist']]) {
+    map.addLayer({ id, type: 'fill', source: 'inei', 'source-layer': lyr,
+      filter: ['==', ['get', 'id_geografia'], -1],
+      paint: { 'fill-color': '#c8102e', 'fill-opacity': 0.35 } });
+    map.addLayer({ id: id + '-o', type: 'line', source: 'inei', 'source-layer': lyr,
+      filter: ['==', ['get', 'id_geografia'], -1],
+      paint: { 'line-color': '#c8102e', 'line-width': 2.5 } });
+  }
+});
+
+const hoverIds = { tb_region: 'h-reg', tb_provincia: 'h-prov', tb_distrito: 'h-dist' };
+function setHighlight(layer, id) {
+  for (const [lyr, hid] of Object.entries(hoverIds)) {
+    const f = ['==', ['get', 'id_geografia'], lyr === layer ? id : -1];
+    map.setFilter(hid, f); map.setFilter(hid + '-o', f);
+  }
+}
+
+const tip = document.getElementById('tip');
+const lvl = document.getElementById('lvl');
+const cache = new Map();
+let current = null, timer = null;
+
+async function loadTip(id) {
+  if (!cache.has(id)) cache.set(id, fetch('/api/tooltip?id=' + id).then(r => r.json()).then(j => j.data));
+  return cache.get(id);
+}
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function render(d) {
+  const title = d.nombdist || d.nombprov || d.nombregion;
+  return `<h4>${esc(title)}</h4><div class="amb">${esc(d.nombAmbito)}</div>
+    <div>${esc(d.indicador)}</div><div class="big">${esc(d.dato)}</div>
+    <div class="row"><span>Hombres</span><b>${esc(d.hombre)}</b></div>
+    <div class="row"><span>Mujeres</span><b>${esc(d.mujer)}</b></div>
+    <div class="row"><span>Densidad</span><b>${esc(d.densidad)}</b></div>`;
+}
+
+function place(e) {
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.point.x + pad, y = e.point.y + pad;
+  if (x + w > innerWidth) x = e.point.x - w - pad;
+  if (y + h > innerHeight) y = e.point.y - h - pad;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+
+map.on('zoom', () => { lvl.textContent = 'Nivel: ' + levelName[levelOf(map.getZoom())]; });
+
+map.on('mousemove', e => {
+  if (!map.getLayer('f-dist')) return;
+  const layer = levelOf(map.getZoom());
+  const f = map.queryRenderedFeatures(e.point, { layers: ['f-dist'] });
+  // El distrito trae ccdd/ccpp, de ahí se derivan los ids de provincia y región
+  const hit = f.length ? f[0] : null;
+  if (!hit) { tip.style.display = 'none'; setHighlight(layer, -1); current = null; map.getCanvas().style.cursor = ''; return; }
+  map.getCanvas().style.cursor = 'pointer';
+  // id_geografia del nivel: distrito 9xxxxxx; prov 8 + ccdd+ccpp; región 7 + ccdd
+  const p = hit.properties;
+  const gid = layer === 'tb_distrito' ? +p.id_geografia
+            : layer === 'tb_provincia' ? +('8' + p.ccdd + p.ccpp + '00')
+            : +('7' + p.cod_region + '0000');
+  if (gid !== current) {
+    current = gid;
+    setHighlight(layer, gid);
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try {
+        const d = await loadTip(gid);
+        if (current === gid) { tip.innerHTML = render(d); tip.style.display = 'block'; place(e); }
+      } catch (_) { tip.style.display = 'none'; }
+    }, 60);
+  }
+  if (tip.style.display === 'block') place(e);
+});
+map.on('mouseout', () => { tip.style.display = 'none'; current = null; });
+</script>
+</body>
+</html>
