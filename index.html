@@ -18,6 +18,12 @@
     padding: 6px 10px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.2); display: flex; gap: 8px; align-items: center; }
   #home { font: inherit; border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 2px 8px; cursor: pointer; }
   #home:hover { background: #f3f3f3; }
+  #filtro { position: absolute; top: 52px; left: 10px; z-index: 5; width: 220px; max-width: calc(100% - 80px);
+    background: #fff; border-radius: 6px; padding: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.2);
+    display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  #combos { display: flex; flex-direction: column; gap: 6px; }
+  #filtro select { width: 100%; font: inherit; padding: 4px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+  #filtro a { color: #c8102e; text-decoration: none; font-weight: 600; }
   #aviso { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); z-index: 9; display: none;
     max-width: min(560px, calc(100% - 32px)); background: #fff3cd; color: #5c4400; border: 1px solid #e0b84c;
     border-radius: 8px; padding: 10px 14px; font-size: 14px; line-height: 1.5; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
@@ -27,6 +33,7 @@
 <body>
 <div id="map"></div>
 <div id="lvl"><span id="lvl-txt">Nivel: Departamento</span> <button id="home" title="Ver todo el Perú">⟲ Perú</button></div>
+<div id="filtro"><div id="combos"></div><a href="/trabajo">Mapa de trabajo (Junín y Huancavelica) →</a></div>
 <div id="tip"></div>
 <div id="aviso"></div>
 <script>
@@ -37,6 +44,7 @@ if (location.protocol === 'file:')
         '<a href="http://localhost:8000">http://localhost:8000</a>');
 </script>
 <script src="/vendor/maplibre-gl.js"></script>
+<script src="/filtro.js"></script>
 <script>
 if (typeof maplibregl === 'undefined' && location.protocol !== 'file:')
   aviso('No cargó la librería del mapa (<code>vendor/maplibre-gl.js</code>). Haz <code>git pull</code> ' +
@@ -96,7 +104,15 @@ map.on('load', async () => {
     map.addLayer({ id: 'h-' + lyr + '-o', type: 'line', source: 'inei', 'source-layer': lyr, minzoom, maxzoom,
       paint: { 'line-color': '#c8102e', 'line-width': ['case', on, 2.5, 0] } });
   }
+
+  // Combos Departamento -> Provincia -> Distrito (filtro.js)
+  Filtro.agregarSeleccion(map, 'inei');
+  excel.then(datos => {
+    filtro = Filtro.crear({ map, contenedor: document.getElementById('combos'), datos,
+      alElegir: gid => gid ? Filtro.acercar(map, gid) : map.fitBounds(PERU, { padding: 20, duration: 900 }) });
+  });
 });
+let filtro = null;
 
 let hovered = null; // { sourceLayer, id }
 function setHighlight(layer, id) {
@@ -212,7 +228,7 @@ function acercar(pt, lngLat) {
 
 map.on('click', e => { acercar(e.point, e.lngLat); schedule(e.point); }); // en celular el toque también muestra el tooltip
 map.on('moveend', () => { if (lastPoint && matchMedia('(hover: hover)').matches) schedule(lastPoint); });
-document.getElementById('home').onclick = () => { clear(); map.fitBounds(PERU, { padding: 20, duration: 900 }); };
+document.getElementById('home').onclick = () => { clear(); filtro?.reiniciar(); map.fitBounds(PERU, { padding: 20, duration: 900 }); };
 map.on('mouseout', () => { lastPoint = null; clear(); });
 map.on('movestart', () => { if (!matchMedia('(hover: hover)').matches) clear(); });
 </script>
