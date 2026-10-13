@@ -33,6 +33,21 @@
   li.falta { cursor: default; color: #a00; }
   li.fuera { cursor: default; color: #888; }
   .nota { color: #777; font-size: 11px; margin-top: 4px; }
+  .modo { display: flex; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; }
+  .modo button { flex: 1; font: inherit; border: 0; background: #fff; padding: 7px; cursor: pointer; }
+  .modo button + button { border-left: 1px solid #ccc; }
+  .modo button.on { background: #1f2937; color: #fff; font-weight: 600; }
+  .card { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; margin-top: 10px; }
+  .card .grande { font-size: 22px; font-weight: 700; color: #8e1b2a; }
+  .card .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin-top: 6px; font-size: 12px; }
+  .barra { display: grid; grid-template-columns: 90px 1fr 28px; gap: 6px; align-items: center; padding: 3px 4px;
+    border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .barra:hover { background: #f1f5fb; }
+  .barra i { display: block; height: 10px; border-radius: 3px; background: #c0392b; }
+  .barra b { text-align: right; }
+  .avisos { color: #8a5a00; font-size: 11px; margin-top: 8px; }
+  .avisos div { margin-top: 3px; }
+  [hidden] { display: none !important; }
   #mapwrap { position: relative; min-height: 0; }
   #map { position: absolute; inset: 0; }
   #aviso { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 9; display: none;
@@ -49,6 +64,7 @@
 <aside id="panel">
   <h1>Junín y Huancavelica</h1>
   <div class="sub">Lista de trabajo · Censo 2025 · se edita en <b>lista_trabajo.xlsx</b></div>
+  <div class="modo"><button data-modo="poblacion">👥 Población</button><button data-modo="jueces">⚖️ Jueces</button></div>
   <div id="combos"></div>
   <div class="botones">
     <button class="btn" id="todo">⟲ Ver todo</button>
@@ -56,11 +72,13 @@
     <a class="btn" href="/">← Mapa general</a>
   </div>
   <h2>Leyenda</h2>
-  <div class="leyenda">
+  <div class="leyenda" id="ley-poblacion">
     <div><span style="background:#fcd34d"></span>Provincia de la lista</div>
     <div><span style="background:#a78bfa"></span>Distrito de la lista</div>
     <div><span style="background:#f4f1ea;border:1px solid #ccc"></span>Resto del departamento</div>
   </div>
+  <div class="leyenda" id="ley-jueces" hidden></div>
+  <div id="panel-jueces" hidden></div>
   <div id="lista"></div>
 </aside>
 <div id="mapwrap">
@@ -86,14 +104,16 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
+let J = {}, modo = 'poblacion';
 let datos = {}, regIds = new Set(), provIds = new Set(), distIds = new Set(), filtro = null;
 
 map.on('load', async () => {
   const [d, lista, cfg] = await Promise.all([
     fetch('/api/datos').then(r => r.json()).catch(() => ({})),
     fetch('/api/lista').then(r => r.json()).catch(() => []),
-    fetch('/api/config').then(r => r.json()).catch(() => ({}))
-  ]);
+    fetch('/api/config').then(r => r.json()).catch(() => ({})),
+    fetch('/api/jueces').then(r => r.json()).catch(() => ({}))
+  ]).then(r => { J = r[3]; return r; });
   datos = d;
   if (!Object.keys(datos).length) aviso('Falta <b>datos.xlsx</b>. Corre <code>python actualizar_excel.py</code>.');
   if (!lista.length) aviso('Falta <b>lista_trabajo.xlsx</b> junto a server.py (o está vacía).');
@@ -124,6 +144,11 @@ map.on('load', async () => {
   fill('f-area', 'tb_distrito', dentro, '#f4f1ea');
   fill('f-prov', 'tb_distrito', ['all', dentro, ['in', PROV, lit(provCod)]], '#fcd34d', 0.6);
   fill('f-dist', 'tb_distrito', ['in', ID, lit([...distIds].map(Number))], '#a78bfa', 0.75);
+  // ⚖️ Jueces: provincias coloreadas por total (hoja Provincias de jueces.xlsx)
+  const colores = ['match', PROV];
+  for (const [gid, p] of Object.entries(J.provincias || {})) colores.push(+gid.slice(1, 5), colorJueces(p.total));
+  fill('j-prov', 'tb_distrito', dentro, colores.length > 2 ? [...colores, '#f4f1ea'] : '#f4f1ea');
+  map.setLayoutProperty('j-prov', 'visibility', 'none');
   line('l-dist', 'tb_distrito', dentro, '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 6, 0.3, 10, 0.9]);
   line('l-prov', 'tb_provincia', ['in', depDe, lit(regCod)], '#6b6458', ['interpolate', ['linear'], ['zoom'], 6, 0.9, 10, 1.8]);
   line('l-reg', 'tb_region', ['in', ID, lit([...regIds].map(Number))], '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 6, 1.8, 10, 3]);
@@ -136,6 +161,18 @@ map.on('load', async () => {
       paint: { 'line-color': '#c8102e', 'line-width': ['case', on, 2.5, 0] } });
   }
   Filtro.agregarSeleccion(map, 'inei');
+
+  // ⚖️ Jueces: una burbuja por sede (distrito), tamaño según cantidad (hoja Data_Plana)
+  map.addSource('sedes', { type: 'geojson', data: { type: 'FeatureCollection',
+    features: (J.sedes || []).filter(s => s.lon != null).map(s => ({ type: 'Feature', properties: { id: s.id, total: s.total },
+      geometry: { type: 'Point', coordinates: [s.lon, s.lat] } })) } });
+  map.addLayer({ id: 'sedes-c', type: 'circle', source: 'sedes', layout: { visibility: 'none' },
+    paint: { 'circle-radius': ['interpolate', ['linear'], ['sqrt', ['get', 'total']], 1, 6, 9, 24],
+      'circle-color': '#1f2937', 'circle-opacity': 0.8, 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
+  pintarJueces();
+  let guardado = null;
+  try { guardado = localStorage.getItem('modo'); } catch {}
+  setModo(guardado === 'jueces' ? 'jueces' : 'poblacion');
 
   // En los combos solo aparece lo de la lista (una provincia de la lista muestra todos sus distritos)
   const permitido = g => g[0] === '8'
@@ -154,6 +191,68 @@ map.on('load', async () => {
     map.fitBounds(AREA, { padding: 30, duration: 0 });
   }
 });
+
+// --- ⚖️ Jueces ---
+const ESCALA = [[50, '#8e1b2a'], [20, '#c0392b'], [10, '#e36b4f'], [5, '#f3a072'], [1, '#f9c9a4']];
+const colorJueces = n => (ESCALA.find(([min]) => n >= min) || [0, '#f4f1ea'])[1];
+
+function setModo(m) {
+  modo = m;
+  try { localStorage.setItem('modo', m); } catch {}
+  document.querySelectorAll('.modo button').forEach(b => b.classList.toggle('on', b.dataset.modo === m));
+  const ver = (id, si) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', si ? 'visible' : 'none');
+  ver('f-prov', m === 'poblacion'); ver('f-dist', m === 'poblacion');
+  ver('j-prov', m === 'jueces'); ver('sedes-c', m === 'jueces');
+  document.getElementById('ley-poblacion').hidden = m !== 'poblacion';
+  document.getElementById('ley-jueces').hidden = m !== 'jueces';
+  document.getElementById('panel-jueces').hidden = m !== 'jueces';
+  clear();
+}
+document.querySelectorAll('.modo button').forEach(b => b.onclick = () => setModo(b.dataset.modo));
+
+function pintarJueces() {
+  const rangos = ESCALA.map(([min], i) => [min, i ? ESCALA[i - 1][0] - 1 : null]).reverse();
+  document.getElementById('ley-jueces').innerHTML =
+    rangos.map(([a, b]) => `<div><span style="background:${colorJueces(a)}"></span>${a}${b ? '–' + b : '+'} jueces en la provincia</div>`).join('') +
+    `<div><span style="background:#f4f1ea;border:1px solid #ccc"></span>Sin jueces en jueces.xlsx</div>` +
+    `<div><span style="background:#1f2937;border-radius:50%"></span>Sede (distrito): tamaño = n.º de jueces</div>`;
+  const c = J.csjj || {}, provs = Object.entries(J.provincias || {}).sort((a, b) => b[1].total - a[1].total);
+  const max = Math.max(1, ...provs.map(([, p]) => p.total));
+  document.getElementById('panel-jueces').innerHTML = `
+    <div class="card">
+      <div>⚖️ Corte Superior de Justicia de Junín</div>
+      <div class="grande">${c.total ?? 0} <small style="font-size:13px">jueces y juezas</small></div>
+      <div class="grid">
+        <span>👨 Varones: <b>${c.varones ?? 0}</b></span><span>👩 Mujeres: <b>${c.mujeres ?? 0}</b></span>
+        <span>🟢 Titulares: <b>${c.titulares ?? 0}</b></span><span>🟡 Provisionales: <b>${c.prov ?? 0}</b></span>
+        <span>🔴 Supernum.: <b>${c.supern ?? 0}</b></span><span>🏢 Salas: <b>${c.sala ?? 0}</b></span>
+        <span>⚡ J. Esp.: <b>${c.jesp ?? 0}</b></span><span>🏘️ JPL: <b>${c.jpl ?? 0}</b></span>
+      </div>
+    </div>
+    <h2>Jueces por provincia</h2>
+    <div id="barras">${provs.map(([gid, p]) => `<div class="barra" data-id="${esc(gid)}"><span>${esc(p.nombre)}</span>
+      <i style="width:${Math.max(2, 100 * p.total / max)}%"></i><b>${p.total}</b></div>`).join('')}</div>
+    ${(J.avisos || []).length ? `<div class="avisos"><b>⚠ Revisar en jueces.xlsx:</b>${J.avisos.map(a => `<div>• ${esc(a)}</div>`).join('')}</div>` : ''}`;
+  document.getElementById('barras').onclick = e => {
+    const gid = e.target.closest('.barra')?.dataset.id;
+    if (gid && !filtro?.ir(gid)) { Filtro.marcar(map, gid); Filtro.acercar(map, gid); }
+  };
+}
+
+// Qué mostrar en modo jueces bajo el cursor: sede (burbuja) o provincia
+function pickJueces(pt) {
+  const s = map.queryRenderedFeatures(pt, { layers: ['sedes-c'] })[0];
+  if (s) {
+    const sede = (J.sedes || []).find(x => x.id === s.properties.id);
+    if (sede) return { gid: sede.id, capa: 'tb_distrito', html: tooltipJuecesHTML(sede, esc(sede.nombre), esc(sede.departamento),
+      `<div class="bajo">Sede en el distrito · provincia ${esc(sede.provincia)}</div>`) };
+  }
+  const t = pick(pt);
+  if (!t) return null;
+  const prov = '8' + t.dist.slice(1, 5) + '00', p = J.provincias?.[prov], d = datos[prov] || {};
+  const pie = p ? '' : '<div class="bajo">Sin jueces registrados en jueces.xlsx</div>';
+  return { gid: prov, capa: 'tb_provincia', html: tooltipJuecesHTML(p, esc(p?.nombre || d.nombprov || ''), esc(p?.departamento || d.nombregion || ''), pie) };
+}
 
 function verTodo() { map.fitBounds(AREA, { padding: 30, duration: 900 }); }
 document.getElementById('todo').onclick = () => { filtro?.reiniciar(); marcarLista(null); clear(); verTodo(); };
@@ -222,6 +321,17 @@ function place(pt) {
 }
 function clear() { tip.style.display = 'none'; setHighlight(null); current = null; map.getCanvas().style.cursor = ''; }
 function update(pt) {
+  if (modo === 'jueces') {
+    const j = pickJueces(pt);
+    if (!j) return clear();
+    map.getCanvas().style.cursor = 'pointer';
+    if ('j|' + j.gid !== current) {
+      current = 'j|' + j.gid;
+      setHighlight(j.capa, +j.gid);
+      tip.innerHTML = j.html; tip.style.display = 'block';
+    }
+    return place(pt);
+  }
   const t = pick(pt);
   if (!t) return clear();
   map.getCanvas().style.cursor = 'pointer';
@@ -247,7 +357,7 @@ map.on('mouseout', () => { lastPoint = null; clear(); });
 map.on('movestart', () => { if (!matchMedia('(hover: hover)').matches) clear(); });
 // Clic: acercarse a lo de la lista que está bajo el cursor (y poner los combos ahí)
 map.on('click', e => {
-  const t = pick(e.point);
+  const t = modo === 'jueces' ? pickJueces(e.point) : pick(e.point);
   schedule(e.point);
   if (!t) return;
   if (!filtro?.ir(t.gid)) { Filtro.marcar(map, t.gid); marcarLista(t.gid); Filtro.acercar(map, t.gid); }

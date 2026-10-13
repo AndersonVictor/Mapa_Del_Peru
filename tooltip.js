@@ -26,6 +26,27 @@ const TOOLTIP_FILAS = [
 //    con su encabezado como texto. Para que NO salga alguna, ponla en esta lista.
 const TOOLTIP_OCULTAR = ['nivel'];
 
+// 4) TOOLTIP DE JUECES (mapa de trabajo, modo ⚖️ Jueces). Mismo orden que la medida RESUMEN del Power BI.
+//    Puedes cambiar textos y emojis; los nombres entre ${ } son los datos.
+function tooltipJuecesHTML(j, titulo, departamento, pie = '') {
+  const v = c => j?.[c] ?? 0;
+  return `<h4>📍 ${titulo.toUpperCase()} — ${departamento}</h4>
+    <div class="sep"></div>
+    <div class="big">⚖️ ${v('total')} <small>Jueces y Juezas</small></div>
+    <div class="row"><span>👨 Varones</span><b>${v('varones')}</b></div>
+    <div class="row"><span>👩 Mujeres</span><b>${v('mujeres')}</b></div>
+    <div class="sep"></div>
+    <div class="sec">📌 POR CONDICIÓN</div>
+    <div class="row"><span>🟢 Titulares</span><b>${v('titulares')}</b></div>
+    <div class="row"><span>🟡 Provisionales</span><b>${v('prov')}</b></div>
+    <div class="row"><span>🔴 Supernumerarios</span><b>${v('supern')}</b></div>
+    <div class="sep"></div>
+    <div class="sec">🏛️ POR INSTANCIA</div>
+    <div class="row"><span>🏢 Salas</span><b>${v('sala')}</b></div>
+    <div class="row"><span>⚡ J. Especializados</span><b>${v('jesp')}</b></div>
+    <div class="row"><span>🏘️ JPL</span><b>${v('jpl')}</b></div>${pie}`;
+}
+
 // -------------------------------------------------------------------------------------
 // (De aquí para abajo no hace falta tocar nada.)
 const USADAS = ['id_geografia', 'nombregion', 'nombprov', 'nombdist', 'nombAmbito', 'indicador', 'dato'];
@@ -55,6 +76,9 @@ function tooltipHTML(d, pie = '') {
   #tip .amb { opacity: .65; font-size: 11px; margin-bottom: 6px; }
   #tip .big { font-size: ${e.tamanoDato}; font-weight: 700; color: ${e.colorDato}; }
   #tip .row { display: flex; justify-content: space-between; gap: 12px; }
+  #tip .big small { font-size: 12px; font-weight: 600; }
+  #tip .sep { border-top: 1px solid rgba(128,128,128,.3); margin: 6px 0; }
+  #tip .sec { font-size: 11px; font-weight: 700; opacity: .7; margin-bottom: 2px; }
   #tip .bajo { opacity: .65; font-size: 11px; margin-top: 6px; border-top: 1px solid rgba(128,128,128,.25); padding-top: 4px; }`;
   document.head.appendChild(css);
 })();
