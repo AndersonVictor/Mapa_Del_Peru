@@ -82,7 +82,9 @@ def propiedades(pbf, capa):
 
 
 def cajas(pbf, capa, z, x, y):
-    """(propiedades, [oeste, sur, este, norte]) de cada polígono de la capa, en lon/lat. y en esquema TMS."""
+    """(propiedades, [oeste, sur, este, norte], (área, momento x, momento y)) de cada polígono de la capa.
+    La caja va en lon/lat; el área y sus momentos en coordenadas de mundo (0-1), para sacar el centro
+    del polígono sumando los pedazos de varios tiles. y en esquema TMS."""
     if pbf[:2] == b"\x1f\x8b":
         pbf = gzip.decompress(pbf)
     n = 2 ** z
@@ -109,24 +111,35 @@ def cajas(pbf, capa, z, x, y):
                     props = {keys[tags[k]]: vals[tags[k + 1]] for k in range(0, len(tags) - 1, 2)}
                 elif ff == 4:
                     geom = fv
-            # Recorre los comandos MoveTo/LineTo de la geometría y guarda el mínimo/máximo
+            # Recorre los comandos MoveTo/LineTo/ClosePath: mínimo/máximo y área de cada anillo (shoelace)
             cx = cy = 0
             x0 = y0 = float("inf"); x1 = y1 = float("-inf")
+            area = mx = my = 0.0
+            anillo = []
             i = 0
             while i < len(geom):
                 c, i = _varint(geom, i)
                 cmd, cnt = c & 7, c >> 3
-                if cmd == 7:
+                if cmd == 7:  # cierra el anillo: los huecos restan solos (giran al revés)
+                    for (ax, ay), (bx, by) in zip(anillo, anillo[1:] + anillo[:1]):
+                        cr = ax * by - bx * ay
+                        area += cr; mx += (ax + bx) * cr; my += (ay + by) * cr
+                    anillo = []
                     continue
                 for _ in range(cnt):
                     dx, i = _varint(geom, i); dy, i = _varint(geom, i)
                     cx += (dx >> 1) ^ -(dx & 1); cy += (dy >> 1) ^ -(dy & 1)
                     x0 = min(x0, cx); x1 = max(x1, cx); y0 = min(y0, cy); y1 = max(y1, cy)
+                    anillo.append((cx, cy))
             if x0 == float("inf"):
                 continue
             lon = lambda px: (x + px / ext) / n * 360 - 180
             lat = lambda py: math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (yx + py / ext) / n))))
-            yield props, [lon(x0), lat(y1), lon(x1), lat(y0)]
+            # a coordenadas de mundo: área * (1/(ext*n))², centro = (tile + px/ext)/n
+            k = 1 / (ext * n)
+            a = area / 2 * k * k
+            centro = ((x + mx / (3 * area) / ext) / n, (yx + my / (3 * area) / ext) / n) if area else (0, 0)
+            yield props, [lon(x0), lat(y1), lon(x1), lat(y0)], (a, a * centro[0], a * centro[1])
 
 
 # --- ids ---

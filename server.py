@@ -5,7 +5,7 @@ Antes, una sola vez, descarga todo con:  python descargar_todo.py
 Las funciones de descarga (token, fetch_tile, fetch_tooltip) solo las usan los scripts
 descargar_todo.py y actualizar_excel.py.
 """
-import io, json, re, threading, time, unicodedata, urllib.request, urllib.error
+import io, json, math, re, threading, time, unicodedata, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
@@ -137,7 +137,8 @@ _ext_lock = threading.Lock()
 
 
 def extensiones():
-    """{id_geografia: [o, s, e, n]} de departamentos, provincias y distritos.
+    """{id_geografia: [o, s, e, n, lon, lat, área]} de departamentos, provincias y distritos.
+    lon/lat = centro del polígono (ahí va su nombre en el mapa).
     Se calcula una vez desde los tiles (unos segundos) y se guarda en cache_tiles/extensiones.json."""
     with _ext_lock:
         if _ext["json"] is not None:
@@ -145,17 +146,17 @@ def extensiones():
         z = min(8, zoom_maximo())
         if EXT_FILE.exists():
             guardado = json.loads(EXT_FILE.read_text())
-            if guardado.get("zoom") == z:
+            if guardado.get("zoom") == z and guardado.get("v") == 2:
                 _ext["json"] = json.dumps(guardado["cajas"]).encode()
                 return _ext["json"]
         from actualizar_excel import cajas, tiles_peru, txt
         print(f"Calculando la extensión de cada zona (zoom {z}), solo esta vez...")
-        res = {}
+        res, mom = {}, {}
         for (tz, x, y) in tiles_peru(z):
             data = tile_local(tz, x, y)
             if not data:
                 continue
-            for p, b in cajas(data, "tb_distrito", tz, x, y):
+            for p, b, (a, ax, ay) in cajas(data, "tb_distrito", tz, x, y):
                 if "id_geografia" not in p:
                     continue
                 ccdd = txt(p.get("ccdd", "")).zfill(2)
@@ -165,9 +166,19 @@ def extensiones():
                     c = res.get(gid)
                     res[gid] = b if c is None else [min(c[0], b[0]), min(c[1], b[1]),
                                                     max(c[2], b[2]), max(c[3], b[3])]
+                    m = mom.setdefault(gid, [0.0, 0.0, 0.0])
+                    m[0] += a; m[1] += ax; m[2] += ay
+        for gid, c in res.items():
+            a, ax, ay = mom[gid]
+            if a:  # centro ponderado por área, de vuelta a lon/lat
+                lon = ax / a * 360 - 180
+                lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * ay / a))))
+            else:
+                lon, lat = (c[0] + c[2]) / 2, (c[1] + c[3]) / 2
+            c += [lon, lat, abs(a) * 1e9]
         res = {k: [round(v, 5) for v in c] for k, c in res.items()}
         if res:
-            EXT_FILE.write_text(json.dumps({"zoom": z, "cajas": res}))
+            EXT_FILE.write_text(json.dumps({"zoom": z, "v": 2, "cajas": res}))
         print(f"Extensiones listas: {len(res)} zonas")
         _ext["json"] = json.dumps(res).encode()
         return _ext["json"]

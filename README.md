@@ -25,6 +25,9 @@ python server.py             # abre http://localhost:8000
 - Botón **⟲ Perú** (arriba a la izquierda) = volver a ver todo el país.
 
 - **Combos Departamento → Provincia → Distrito** (arriba a la izquierda): eligen una zona, la marcan en azul y acercan el mapa.
+- **Nombres en el mapa**: al elegir un departamento aparecen los nombres de sus provincias; al elegir una provincia,
+  los de sus distritos (el distrito elegido en azul). Si dos nombres se tapan, se oculta el de la zona más chica
+  y reaparece al acercar. En el mapa de trabajo se ven las provincias desde el inicio.
 
 ## Mapa de trabajo: Junín y Huancavelica (http://localhost:8000/trabajo)
 
