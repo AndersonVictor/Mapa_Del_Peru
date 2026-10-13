@@ -46,4 +46,8 @@ Muestra solo las zonas de `lista_trabajo.xlsx` (columnas `NOMBRE`, `NIVEL`, `DEP
 - Edita, guarda y **recarga la página** (F5): no hace falta reiniciar el servidor.
 - `python actualizar_excel.py` agrega solo las filas que falten (no toca lo que editaste).
   `python actualizar_excel.py --todo` lo vuelve a bajar todo y sobrescribe tus cambios.
+- **Columnas nuevas**: agrega una columna a `datos.xlsx` (el encabezado es el texto que se muestra)
+  y aparece sola en el tooltip de ambos mapas y en la descarga a Excel. `actualizar_excel.py` la conserva.
+  Las celdas vacías no se muestran.
+- **Personalizar el tooltip** (colores, textos, orden, ocultar filas): todo está al inicio de `tooltip.js`.
 - Cierra el Excel antes de correr los scripts (Windows no deja guardar un archivo abierto).

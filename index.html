@@ -7,13 +7,6 @@
 <link rel="stylesheet" href="/vendor/maplibre-gl.css">
 <style>
   html, body, #map { margin: 0; height: 100%; background: #eef2f5; font-family: system-ui, sans-serif; }
-  #tip { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: none; display: none; z-index: 5; min-width: 210px;
-    background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); padding: 10px 12px;
-    font-size: 13px; line-height: 1.45; color: #222; border-left: 4px solid #c8102e; }
-  #tip h4 { margin: 0 0 2px; font-size: 14px; }
-  #tip .amb { color: #666; font-size: 11px; margin-bottom: 6px; }
-  #tip .big { font-size: 20px; font-weight: 700; color: #c8102e; }
-  #tip .row { display: flex; justify-content: space-between; gap: 12px; }
   #lvl { position: absolute; top: 10px; left: 10px; z-index: 5; background: #fff; border-radius: 6px;
     padding: 6px 10px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.2); display: flex; gap: 8px; align-items: center; }
   #home { font: inherit; border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 2px 8px; cursor: pointer; }
@@ -45,6 +38,7 @@ if (location.protocol === 'file:')
 </script>
 <script src="/vendor/maplibre-gl.js"></script>
 <script src="/filtro.js"></script>
+<script src="/tooltip.js"></script>
 <script>
 if (typeof maplibregl === 'undefined' && location.protocol !== 'file:')
   aviso('No cargó la librería del mapa (<code>vendor/maplibre-gl.js</code>). Haz <code>git pull</code> ' +
@@ -129,14 +123,6 @@ const excel = fetch('/api/datos').then(r => r.json()).catch(() => ({}));
 const loadTip = id => excel.then(d => d[id]);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function render(d) {
-  const title = d.nombdist || d.nombprov || d.nombregion;
-  return `<h4>${esc(title)}</h4><div class="amb">${esc(d.nombAmbito)}</div>
-    <div>${esc(d.indicador)}</div><div class="big">${esc(d.dato)}</div>
-    <div class="row"><span>Hombres</span><b>${esc(d.hombre)}</b></div>
-    <div class="row"><span>Mujeres</span><b>${esc(d.mujer)}</b></div>
-    <div class="row"><span>Densidad</span><b>${esc(d.densidad)}</b></div>`;
-}
 
 let lastPoint = null;
 function place(pt) {
@@ -183,7 +169,7 @@ function update(pt) {
     setHighlight(layer, gid);
     loadTip(gid).then(d => {
       if (current !== gid || !d) return;
-      tip.innerHTML = render(d); tip.style.display = 'block'; place(lastPoint);
+      tip.innerHTML = tooltipHTML(d); tip.style.display = 'block'; place(lastPoint);
     }).catch(() => { tip.style.display = 'none'; });
   }
   if (tip.style.display === 'block') place(pt);

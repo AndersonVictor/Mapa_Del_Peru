@@ -173,11 +173,13 @@ def bajar(gid):
 
 def main():
     todo = "--todo" in sys.argv
-    existentes = {}
+    existentes, extras = {}, []
     if EXCEL.exists() and not todo:
         ws = load_workbook(EXCEL).worksheets[0]
         filas = ws.iter_rows(values_only=True)
         cab = [str(c or "") for c in next(filas, [])]
+        # columnas que agregaste a mano: se conservan
+        extras = [c for c in cab if c and c not in COLUMNAS and c != "nivel"]
         for fila in filas:
             d = dict(zip(cab, fila))
             if d.get("id_geografia") is not None:
@@ -193,14 +195,14 @@ def main():
             if k % 200 == 0:
                 print(f"  {k}/{len(faltan)}")
 
-    cab = ["id_geografia", "nivel"] + COLUMNAS[1:]
+    cab = ["id_geografia", "nivel"] + COLUMNAS[1:] + extras
     wb = Workbook()
     ws = wb.active
     ws.title = "datos"
     ws.append(cab)
     for gid in sorted({**existentes, **nuevos}):
         d = existentes.get(gid) or nuevos[gid]
-        ws.append([int(gid), NIVEL.get(gid[0], "")] + [d.get(c) for c in COLUMNAS[1:]])
+        ws.append([int(gid), NIVEL.get(gid[0], "")] + [d.get(c) for c in COLUMNAS[1:] + extras])
     for c in ws[1]:
         c.font = Font(bold=True, color="FFFFFF")
         c.fill = PatternFill("solid", fgColor="C8102E")
