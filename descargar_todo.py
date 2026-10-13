@@ -9,7 +9,7 @@
 Se puede cortar y volver a correr: lo ya descargado no se vuelve a pedir.
 Va despacio a propósito (pocas conexiones y una pausa) para no cargar el servidor del INEI.
 """
-import sys, time
+import sys, time, urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
 import actualizar_excel
@@ -31,6 +31,8 @@ def bajar(t):
             return True
         except Exception as e:
             err = e
+            if isinstance(e, urllib.error.HTTPError) and e.code < 500:
+                break  # error del pedido, reintentar no sirve
             time.sleep(2 ** intento)
     print(f"  no se pudo bajar {z}/{x}/{y}: {err}")
     return False

@@ -57,13 +57,17 @@ def fetch_tile(z, x, y):
     for attempt in (0, 1):
         try:
             data = get(url, {"geomatica_key_dinamic": token(force=attempt == 1), "Referer": SITE + "/"})
-            _tile_cache[key] = data
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(data)
-            return data
+            break
         except urllib.error.HTTPError as e:
+            if e.code == 404:  # fuera del área con datos (p. ej. al norte del ecuador): tile vacío
+                data = b""
+                break
             if e.code not in (401, 403) or attempt:
                 raise
+    _tile_cache[key] = data
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return data
 
 
 def fetch_tooltip(gid, ind=1, year=2025):
