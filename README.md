@@ -24,6 +24,20 @@ python server.py             # abre http://localhost:8000
 - **Clic** en una zona = acercarse a ella, como en el INEI: departamento → sus provincias → sus distritos.
 - Botón **⟲ Perú** (arriba a la izquierda) = volver a ver todo el país.
 
+- **Combos Departamento → Provincia → Distrito** (arriba a la izquierda): eligen una zona, la marcan en azul y acercan el mapa.
+
+## Mapa de trabajo: Junín y Huancavelica (http://localhost:8000/trabajo)
+
+Muestra solo las zonas de `lista_trabajo.xlsx` (columnas `NOMBRE`, `NIVEL`, `DEPARTAMENTO`, `PROVINCIA`):
+
+- El área del mapa son los departamentos que la lista tiene con `NIVEL = DEPARTAMENTO` (hoy Junín y Huancavelica).
+  Las filas de otros departamentos (Huancané, Pacasmayo, Urubamba) aparecen en el panel como *fuera del área*.
+- Amarillo = provincia de la lista, violeta = distrito de la lista. El tooltip muestra lo más específico de la lista bajo el cursor.
+- Clic en el mapa o en la lista del panel = acercarse a esa zona. Los combos solo ofrecen lo que está en la lista.
+- **Descargar Excel**: la lista con los datos de `datos.xlsx` (población, hombres, mujeres, densidad).
+- Los nombres se buscan en `datos.xlsx` sin importar tildes ni Ñ. Si alguno sale con ⚠ *no encontrado*, revisa cómo está escrito.
+- Edita la lista, guarda y recarga la página (F5).
+
 ## Editar los textos del tooltip (datos.xlsx)
 
 - Una fila por departamento (id 7…), provincia (id 8…) y distrito (id 9…).

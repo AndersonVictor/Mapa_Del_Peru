@@ -81,6 +81,54 @@ def propiedades(pbf, capa):
                     yield {keys[tags[k]]: vals[tags[k + 1]] for k in range(0, len(tags) - 1, 2)}
 
 
+def cajas(pbf, capa, z, x, y):
+    """(propiedades, [oeste, sur, este, norte]) de cada polígono de la capa, en lon/lat. y en esquema TMS."""
+    if pbf[:2] == b"\x1f\x8b":
+        pbf = gzip.decompress(pbf)
+    n = 2 ** z
+    yx = n - 1 - y
+    for f, _, layer in _campos(pbf):
+        if f != 3:
+            continue
+        nombre, feats, keys, vals, ext = None, [], [], [], 4096
+        for lf, _, lv in _campos(layer):
+            if lf == 1: nombre = lv.decode()
+            elif lf == 2: feats.append(lv)
+            elif lf == 3: keys.append(lv.decode())
+            elif lf == 4: vals.append(_valor(lv))
+            elif lf == 5: ext = lv
+        if nombre != capa:
+            continue
+        for feat in feats:
+            props, geom = {}, b""
+            for ff, _, fv in _campos(feat):
+                if ff == 2:
+                    tags, j = [], 0
+                    while j < len(fv):
+                        k, j = _varint(fv, j); tags.append(k)
+                    props = {keys[tags[k]]: vals[tags[k + 1]] for k in range(0, len(tags) - 1, 2)}
+                elif ff == 4:
+                    geom = fv
+            # Recorre los comandos MoveTo/LineTo de la geometría y guarda el mínimo/máximo
+            cx = cy = 0
+            x0 = y0 = float("inf"); x1 = y1 = float("-inf")
+            i = 0
+            while i < len(geom):
+                c, i = _varint(geom, i)
+                cmd, cnt = c & 7, c >> 3
+                if cmd == 7:
+                    continue
+                for _ in range(cnt):
+                    dx, i = _varint(geom, i); dy, i = _varint(geom, i)
+                    cx += (dx >> 1) ^ -(dx & 1); cy += (dy >> 1) ^ -(dy & 1)
+                    x0 = min(x0, cx); x1 = max(x1, cx); y0 = min(y0, cy); y1 = max(y1, cy)
+            if x0 == float("inf"):
+                continue
+            lon = lambda px: (x + px / ext) / n * 360 - 180
+            lat = lambda py: math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (yx + py / ext) / n))))
+            yield props, [lon(x0), lat(y1), lon(x1), lat(y0)]
+
+
 # --- ids ---
 def tiles_peru(z):
     def xy(lon, lat):

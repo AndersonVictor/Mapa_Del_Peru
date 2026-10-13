@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Junín y Huancavelica - Lista de trabajo</title>
+<link rel="stylesheet" href="/vendor/maplibre-gl.css">
+<style>
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; color: #222; background: #eef2f5; }
+  body { display: grid; grid-template-columns: 320px 1fr; }
+  #panel { overflow-y: auto; background: #fff; box-shadow: 1px 0 8px rgba(0,0,0,.12); z-index: 6; padding: 14px; font-size: 13px; }
+  #panel h1 { font-size: 17px; margin: 0; }
+  #panel .sub { color: #666; font-size: 12px; margin: 2px 0 10px; }
+  #panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #555; margin: 14px 0 6px; }
+  #combos { display: flex; flex-direction: column; gap: 6px; }
+  select { width: 100%; font: inherit; padding: 5px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+  .botones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .btn { font: inherit; font-size: 12px; border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 5px 9px;
+    cursor: pointer; color: #222; text-decoration: none; }
+  .btn:hover { background: #f3f3f3; }
+  .btn.rojo { background: #c8102e; border-color: #c8102e; color: #fff; }
+  .btn.rojo:hover { background: #a50d26; }
+  .leyenda { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+  .leyenda span { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { padding: 5px 6px; border-radius: 4px; cursor: pointer; display: flex; gap: 6px; align-items: baseline; }
+  li:hover, li.activo { background: #f1f5fb; }
+  li .niv { font-size: 10px; font-weight: 700; border-radius: 3px; padding: 1px 4px; flex: none; }
+  li .n-DEPARTAMENTO { background: #e5e5e5; color: #222; }
+  li .n-PROVINCIA { background: #fde68a; color: #6b4e00; }
+  li .n-DISTRITO { background: #ddd6fe; color: #4c1d95; }
+  li small { color: #777; }
+  li.falta { cursor: default; color: #a00; }
+  li.fuera { cursor: default; color: #888; }
+  .nota { color: #777; font-size: 11px; margin-top: 4px; }
+  #mapwrap { position: relative; min-height: 0; }
+  #map { position: absolute; inset: 0; }
+  #tip { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: none; display: none; z-index: 5; min-width: 210px;
+    background: #fff; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.25); padding: 10px 12px;
+    font-size: 13px; line-height: 1.45; color: #222; border-left: 4px solid #c8102e; }
+  #tip h4 { margin: 0 0 2px; font-size: 14px; }
+  #tip .amb { color: #666; font-size: 11px; margin-bottom: 6px; }
+  #tip .big { font-size: 20px; font-weight: 700; color: #c8102e; }
+  #tip .row { display: flex; justify-content: space-between; gap: 12px; }
+  #tip .bajo { color: #777; font-size: 11px; margin-top: 6px; border-top: 1px solid #eee; padding-top: 4px; }
+  #aviso { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 9; display: none;
+    max-width: min(520px, calc(100% - 32px)); background: #fff3cd; color: #5c4400; border: 1px solid #e0b84c;
+    border-radius: 8px; padding: 10px 14px; font-size: 14px; line-height: 1.5; }
+  @media (max-width: 760px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 58vh 1fr; }
+    #panel { order: 2; box-shadow: 0 -1px 8px rgba(0,0,0,.12); }
+    #mapwrap { order: 1; }
+  }
+</style>
+</head>
+<body>
+<aside id="panel">
+  <h1>Junín y Huancavelica</h1>
+  <div class="sub">Lista de trabajo · Censo 2025 · se edita en <b>lista_trabajo.xlsx</b></div>
+  <div id="combos"></div>
+  <div class="botones">
+    <button class="btn" id="todo">⟲ Ver todo</button>
+    <a class="btn rojo" href="/api/lista.xlsx">Descargar Excel</a>
+    <a class="btn" href="/">← Mapa general</a>
+  </div>
+  <h2>Leyenda</h2>
+  <div class="leyenda">
+    <div><span style="background:#fcd34d"></span>Provincia de la lista</div>
+    <div><span style="background:#a78bfa"></span>Distrito de la lista</div>
+    <div><span style="background:#f4f1ea;border:1px solid #ccc"></span>Resto del departamento</div>
+  </div>
+  <div id="lista"></div>
+</aside>
+<div id="mapwrap">
+  <div id="map"></div>
+  <div id="tip"></div>
+  <div id="aviso"></div>
+</div>
+<script src="/vendor/maplibre-gl.js"></script>
+<script src="/filtro.js"></script>
+<script>
+function aviso(html) { const a = document.getElementById('aviso'); a.innerHTML = html; a.style.display = 'block'; }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const pad = v => String(v ?? '').split('.')[0].padStart(2, '0');
+
+// Junín y Huancavelica aproximado, hasta que llegan las extensiones reales
+let AREA = [[-76.9, -14.2], [-73.3, -10.5]];
+const map = new maplibregl.Map({
+  container: 'map',
+  style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#eef2f5' } }] },
+  bounds: AREA, fitBoundsOptions: { padding: 30 },
+  maxZoom: 14, fadeDuration: 0, renderWorldCopies: false, attributionControl: false
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+let datos = {}, regIds = new Set(), provIds = new Set(), distIds = new Set(), filtro = null;
+
+map.on('load', async () => {
+  const [d, lista, cfg] = await Promise.all([
+    fetch('/api/datos').then(r => r.json()).catch(() => ({})),
+    fetch('/api/lista').then(r => r.json()).catch(() => []),
+    fetch('/api/config').then(r => r.json()).catch(() => ({}))
+  ]);
+  datos = d;
+  if (!Object.keys(datos).length) aviso('Falta <b>datos.xlsx</b>. Corre <code>python actualizar_excel.py</code>.');
+  if (!lista.length) aviso('Falta <b>lista_trabajo.xlsx</b> junto a server.py (o está vacía).');
+
+  const enArea = lista.filter(f => f.en_area && f.id);
+  for (const f of enArea) ({ 7: regIds, 8: provIds, 9: distIds })[f.id[0]].add(f.id);
+  pintarLista(lista);
+
+  // Expresiones sobre las propiedades del distrito en los tiles
+  const ID = ['to-number', ['get', 'id_geografia']];
+  const REG = ['to-number', ['coalesce', ['get', 'cod_region'], ['get', 'ccdd']]];
+  const PROV = ['+', ['*', ['to-number', ['get', 'ccdd']], 100], ['to-number', ['get', 'ccpp']]];
+  const lit = (xs) => ['literal', [...xs]];
+  const regCod = [...regIds].map(g => +g.slice(1, 3));
+  const provCod = [...provIds].map(g => +g.slice(1, 5));
+  const dentro = ['in', REG, lit(regCod)];
+  const depDe = ['%', ['floor', ['/', ID, 10000]], 100]; // id 7/8/9 + ccdd... -> ccdd
+
+  map.addSource('inei', { type: 'vector', tiles: [location.origin + '/tiles/{z}/{x}/{y}.pbf'],
+    scheme: 'tms', minzoom: 0, maxzoom: cfg.maxzoom || 10,
+    promoteId: { tb_region: 'id_geografia', tb_provincia: 'id_geografia', tb_distrito: 'id_geografia' } });
+  const fill = (id, layer, filter, color, opacity = 1) => map.addLayer({ id, type: 'fill', source: 'inei',
+    'source-layer': layer, filter, paint: { 'fill-color': color, 'fill-opacity': opacity } });
+  const line = (id, layer, filter, color, w) => map.addLayer({ id, type: 'line', source: 'inei',
+    'source-layer': layer, filter, paint: { 'line-color': color, 'line-width': w } });
+
+  // Solo se dibujan los departamentos de la lista; afuera no hay nada
+  fill('f-area', 'tb_distrito', dentro, '#f4f1ea');
+  fill('f-prov', 'tb_distrito', ['all', dentro, ['in', PROV, lit(provCod)]], '#fcd34d', 0.6);
+  fill('f-dist', 'tb_distrito', ['in', ID, lit([...distIds].map(Number))], '#a78bfa', 0.75);
+  line('l-dist', 'tb_distrito', dentro, '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 6, 0.3, 10, 0.9]);
+  line('l-prov', 'tb_provincia', ['in', depDe, lit(regCod)], '#6b6458', ['interpolate', ['linear'], ['zoom'], 6, 0.9, 10, 1.8]);
+  line('l-reg', 'tb_region', ['in', ID, lit([...regIds].map(Number))], '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 6, 1.8, 10, 3]);
+
+  const on = ['boolean', ['feature-state', 'hover'], false];
+  for (const capa of ['tb_region', 'tb_provincia', 'tb_distrito']) {
+    map.addLayer({ id: 'h-' + capa, type: 'fill', source: 'inei', 'source-layer': capa,
+      paint: { 'fill-color': '#c8102e', 'fill-opacity': ['case', on, 0.25, 0] } });
+    map.addLayer({ id: 'h-' + capa + '-o', type: 'line', source: 'inei', 'source-layer': capa,
+      paint: { 'line-color': '#c8102e', 'line-width': ['case', on, 2.5, 0] } });
+  }
+  Filtro.agregarSeleccion(map, 'inei');
+
+  // En los combos solo aparece lo de la lista (una provincia de la lista muestra todos sus distritos)
+  const permitido = g => g[0] === '8'
+    ? provIds.has(g) || [...distIds].some(x => x.slice(1, 5) === g.slice(1, 5))
+    : distIds.has(g) || provIds.has('8' + g.slice(1, 5) + '00');
+  filtro = Filtro.crear({ map, contenedor: document.getElementById('combos'), datos, area: regIds, permitido,
+    alElegir: gid => { marcarLista(gid); gid ? Filtro.acercar(map, gid) : verTodo(); } });
+
+  // Encuadre exacto de los departamentos y no dejar irse lejos
+  const ext = await Filtro.extensiones();
+  const cajas = [...regIds].map(g => ext[g]).filter(Boolean);
+  if (cajas.length) {
+    AREA = [[Math.min(...cajas.map(c => c[0])), Math.min(...cajas.map(c => c[1]))],
+            [Math.max(...cajas.map(c => c[2])), Math.max(...cajas.map(c => c[3]))]];
+    map.setMaxBounds([[AREA[0][0] - 3, AREA[0][1] - 3], [AREA[1][0] + 3, AREA[1][1] + 3]]);
+    map.fitBounds(AREA, { padding: 30, duration: 0 });
+  }
+});
+
+function verTodo() { map.fitBounds(AREA, { padding: 30, duration: 900 }); }
+document.getElementById('todo').onclick = () => { filtro?.reiniciar(); marcarLista(null); clear(); verTodo(); };
+
+// --- Lista del panel ---
+const NIV = { DEPARTAMENTO: 0, PROVINCIA: 1, DISTRITO: 2 };
+function pintarLista(lista) {
+  const cont = document.getElementById('lista');
+  const dentro = lista.filter(f => f.en_area), fuera = lista.filter(f => !f.en_area);
+  const nProv = dentro.filter(f => Filtro.N(f.nivel) === 'PROVINCIA').length;
+  const nDist = dentro.filter(f => Filtro.N(f.nivel) === 'DISTRITO').length;
+  const item = f => {
+    const niv = Filtro.N(f.nivel);
+    const cls = !f.en_area ? 'fuera' : f.id ? '' : 'falta';
+    const extra = f.provincia && niv === 'DISTRITO' ? ` <small>· ${esc(f.provincia)}</small>` : '';
+    const falta = f.en_area && !f.id ? ' <small>⚠ no encontrado en datos.xlsx</small>' : '';
+    const fueraTxt = !f.en_area ? ` <small>· ${esc(f.departamento)}</small>` : '';
+    return `<li class="${cls}" data-id="${esc(f.id || '')}"><span class="niv n-${esc(niv)}">${esc(niv.slice(0, 4))}</span>` +
+           `<span>${esc(f.nombre)}${extra}${fueraTxt}${falta}</span></li>`;
+  };
+  const orden = (a, b) => (NIV[Filtro.N(a.nivel)] ?? 9) - (NIV[Filtro.N(b.nivel)] ?? 9) || a.nombre.localeCompare(b.nombre, 'es');
+  let html = `<h2>Lista (${nProv} provincias · ${nDist} distritos)</h2>`;
+  const deps = [...new Set(dentro.map(f => f.departamento || f.nombre))].sort();
+  for (const dep of deps)
+    html += `<h2>${esc(dep)}</h2><ul>${dentro.filter(f => (f.departamento || f.nombre) === dep).sort(orden).map(item).join('')}</ul>`;
+  if (fuera.length)
+    html += `<h2>Fuera del área (no se muestran)</h2><ul>${fuera.sort(orden).map(item).join('')}</ul>` +
+            `<div class="nota">Para verlos, agrega su departamento a lista_trabajo.xlsx con NIVEL = DEPARTAMENTO.</div>`;
+  cont.innerHTML = html;
+  cont.onclick = e => {
+    const li = e.target.closest('li[data-id]');
+    const gid = li?.dataset.id;
+    if (!gid) return;
+    if (!filtro?.ir(gid)) { Filtro.marcar(map, gid); marcarLista(gid); Filtro.acercar(map, gid); }
+  };
+}
+function marcarLista(gid) {
+  document.querySelectorAll('#lista li').forEach(li => li.classList.toggle('activo', !!gid && li.dataset.id === gid));
+}
+
+// --- Tooltip y resaltado: muestra lo más específico de la lista bajo el cursor ---
+const tip = document.getElementById('tip');
+let hovered = null, current = null, lastPoint = null;
+function setHighlight(capa, id) {
+  if (hovered) map.setFeatureState({ source: 'inei', ...hovered }, { hover: false });
+  hovered = capa ? { sourceLayer: capa, id } : null;
+  if (hovered) map.setFeatureState({ source: 'inei', ...hovered }, { hover: true });
+}
+function pick(pt) {
+  if (!map.getLayer('f-area')) return null;
+  const hit = map.queryRenderedFeatures(pt, { layers: ['f-area'] })[0];
+  if (!hit) return null;
+  const p = hit.properties;
+  const dist = String(p.id_geografia).split('.')[0];
+  const prov = '8' + pad(p.ccdd) + pad(p.ccpp) + '00';
+  const reg = '7' + pad(p.cod_region ?? p.ccdd) + '0000';
+  const gid = distIds.has(dist) ? dist : provIds.has(prov) ? prov : reg;
+  return { gid, capa: Filtro.CAPA[gid[0]], dist };
+}
+function render(d, t) {
+  const title = d.nombdist || d.nombprov || d.nombregion;
+  const bajo = t.gid !== t.dist && datos[t.dist] ? `<div class="bajo">Distrito bajo el cursor: ${esc(datos[t.dist].nombdist)}</div>` : '';
+  return `<h4>${esc(title)}</h4><div class="amb">${esc(d.nombAmbito)}</div>
+    <div>${esc(d.indicador)}</div><div class="big">${esc(d.dato)}</div>
+    <div class="row"><span>Hombres</span><b>${esc(d.hombre)}</b></div>
+    <div class="row"><span>Mujeres</span><b>${esc(d.mujer)}</b></div>
+    <div class="row"><span>Densidad</span><b>${esc(d.densidad)}</b></div>${bajo}`;
+}
+function place(pt) {
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight, c = map.getContainer();
+  let x = pt.x + pad, y = pt.y + pad;
+  if (x + w > c.clientWidth) x = pt.x - w - pad;
+  if (y + h > c.clientHeight) y = pt.y - h - pad;
+  tip.style.transform = `translate(${x}px, ${y}px)`;
+}
+function clear() { tip.style.display = 'none'; setHighlight(null); current = null; map.getCanvas().style.cursor = ''; }
+function update(pt) {
+  const t = pick(pt);
+  if (!t) return clear();
+  map.getCanvas().style.cursor = 'pointer';
+  const key = t.gid + '|' + t.dist;
+  if (key !== current) {
+    current = key;
+    setHighlight(t.capa, +t.gid);
+    const d = datos[t.gid];
+    if (d) { tip.innerHTML = render(d, t); tip.style.display = 'block'; } else tip.style.display = 'none';
+  }
+  if (tip.style.display === 'block') place(pt);
+}
+let pending = false;
+function schedule(pt) {
+  lastPoint = pt;
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; if (lastPoint) update(lastPoint); });
+}
+map.on('mousemove', e => schedule(e.point));
+map.on('mouseout', () => { lastPoint = null; clear(); });
+map.on('movestart', () => { if (!matchMedia('(hover: hover)').matches) clear(); });
+// Clic: acercarse a lo de la lista que está bajo el cursor (y poner los combos ahí)
+map.on('click', e => {
+  const t = pick(e.point);
+  schedule(e.point);
+  if (!t) return;
+  if (!filtro?.ir(t.gid)) { Filtro.marcar(map, t.gid); marcarLista(t.gid); Filtro.acercar(map, t.gid); }
+});
+</script>
+</body>
+</html>

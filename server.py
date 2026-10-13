@@ -5,13 +5,14 @@ Antes, una sola vez, descarga todo con:  python descargar_todo.py
 Las funciones de descarga (token, fetch_tile, fetch_tooltip) solo las usan los scripts
 descargar_todo.py y actualizar_excel.py.
 """
-import json, re, threading, time, urllib.request, urllib.error
+import io, json, re, threading, time, unicodedata, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 PORT = 8000
 EXCEL = ROOT / "datos.xlsx"
+LISTA = ROOT / "lista_trabajo.xlsx"  # zonas del mapa de trabajo (/trabajo)
 TILE_DIR = ROOT / "cache_tiles"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/155.0.0.0 Safari/537.36"
 SITE = "https://censos2025.inei.gob.pe"
@@ -25,7 +26,7 @@ _tok = {"v": None, "exp": 0}
 _lock = threading.Lock()
 _tile_cache = {}
 _tip_cache = {}
-_excel = {"mtime": None, "json": b"{}"}
+_excel = {"mtime": None, "json": b"{}", "datos": {}}
 _excel_lock = threading.Lock()
 
 
@@ -96,6 +97,7 @@ def excel_json():
                     if gid.isdigit():
                         datos[gid] = d
             _excel["json"] = json.dumps(datos, ensure_ascii=False).encode()
+            _excel["datos"] = datos
             _excel["mtime"] = mtime
             print(f"datos.xlsx cargado: {len(datos)} filas")
         return _excel["json"]
@@ -127,8 +129,134 @@ def resumen_tiles():
     return total, con_datos
 
 
+# --- Extensión (caja oeste, sur, este, norte) de cada zona, para acercarse desde los combos ---
+EXT_FILE = TILE_DIR / "extensiones.json"
+_ext = {"json": None}
+_ext_lock = threading.Lock()
+
+
+def extensiones():
+    """{id_geografia: [o, s, e, n]} de departamentos, provincias y distritos.
+    Se calcula una vez desde los tiles (unos segundos) y se guarda en cache_tiles/extensiones.json."""
+    with _ext_lock:
+        if _ext["json"] is not None:
+            return _ext["json"]
+        z = min(8, zoom_maximo())
+        if EXT_FILE.exists():
+            guardado = json.loads(EXT_FILE.read_text())
+            if guardado.get("zoom") == z:
+                _ext["json"] = json.dumps(guardado["cajas"]).encode()
+                return _ext["json"]
+        from actualizar_excel import cajas, tiles_peru, txt
+        print(f"Calculando la extensión de cada zona (zoom {z}), solo esta vez...")
+        res = {}
+        for (tz, x, y) in tiles_peru(z):
+            data = tile_local(tz, x, y)
+            if not data:
+                continue
+            for p, b in cajas(data, "tb_distrito", tz, x, y):
+                if "id_geografia" not in p:
+                    continue
+                ccdd = txt(p.get("ccdd", "")).zfill(2)
+                ccpp = txt(p.get("ccpp", "")).zfill(2)
+                reg = txt(p.get("cod_region", ccdd)).zfill(2)
+                for gid in (txt(p["id_geografia"]), "8" + ccdd + ccpp + "00", "7" + reg + "0000"):
+                    c = res.get(gid)
+                    res[gid] = b if c is None else [min(c[0], b[0]), min(c[1], b[1]),
+                                                    max(c[2], b[2]), max(c[3], b[3])]
+        res = {k: [round(v, 5) for v in c] for k, c in res.items()}
+        if res:
+            EXT_FILE.write_text(json.dumps({"zoom": z, "cajas": res}))
+        print(f"Extensiones listas: {len(res)} zonas")
+        _ext["json"] = json.dumps(res).encode()
+        return _ext["json"]
+
+
+# --- Lista de trabajo (lista_trabajo.xlsx): nombres -> id_geografia usando datos.xlsx ---
+NIVELES = {"DEPARTAMENTO": "7", "PROVINCIA": "8", "DISTRITO": "9"}
+CAMPO_NOMBRE = {"7": "nombregion", "8": "nombprov", "9": "nombdist"}
+
+
+def norm(s):
+    """'Junín ' -> 'JUNIN'; Ñ -> N; sin tildes ni espacios dobles."""
+    s = unicodedata.normalize("NFD", str(s or "")).upper()
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = re.sub(r"\s+", " ", s).strip()
+    return re.sub(r"^(DEPARTAMENTO|PROVINCIA|DISTRITO) (DE )?", "", s)
+
+
+def leer_lista():
+    if not LISTA.exists():
+        return []
+    from openpyxl import load_workbook
+    ws = load_workbook(LISTA, read_only=True, data_only=True).worksheets[0]
+    filas = ws.iter_rows(values_only=True)
+    cab = [norm(c) for c in next(filas, [])]
+    out = []
+    for fila in filas:
+        d = dict(zip(cab, fila))
+        if d.get("NOMBRE"):
+            out.append({k: str(d.get(k.upper()) or "").strip()
+                        for k in ("nombre", "nivel", "departamento", "provincia")})
+    return out
+
+
+def buscar(fila, datos):
+    """id_geografia de una fila de la lista, o None. Filtra por nombre, luego departamento y provincia."""
+    nivel = NIVELES.get(norm(fila["nivel"]))
+    if not nivel:
+        return None
+    campo = CAMPO_NOMBRE[nivel]
+    cand = [g for g, d in datos.items() if g[0] == nivel and norm(d.get(campo)) == norm(fila["nombre"])]
+    for col, campo in (("departamento", "nombregion"), ("provincia", "nombprov")):
+        if fila[col]:
+            mejor = [g for g in cand if norm(datos[g].get(campo)) == norm(fila[col])]
+            if mejor:
+                cand = mejor
+    return cand[0] if cand else None
+
+
+def lista_json():
+    excel_json()  # relee datos.xlsx si cambió
+    datos = _excel["datos"]
+    filas = leer_lista()
+    for f in filas:
+        f["id"] = buscar(f, datos)
+    # El área del mapa = los departamentos que la lista tiene como DEPARTAMENTO
+    area = {norm(f["nombre"]) for f in filas if norm(f["nivel"]) == "DEPARTAMENTO"}
+    for f in filas:
+        f["en_area"] = norm(f["departamento"] or f["nombre"]) in area
+    return filas
+
+
+def lista_xlsx():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    filas = lista_json()
+    datos = _excel["datos"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "lista"
+    ws.append(["nombre", "nivel", "departamento", "provincia"] + COLUMNAS)
+    for f in filas:
+        if not f["en_area"]:
+            continue
+        d = datos.get(f["id"] or "", {})
+        ws.append([f["nombre"], f["nivel"], f["departamento"], f["provincia"]] +
+                  [d.get(c, "") if c != "id_geografia" else (f["id"] or "NO ENCONTRADO") for c in COLUMNAS])
+    for c in ws[1]:
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor="C8102E")
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
-             "/vendor/maplibre-gl.css": "text/css"}
+             "/vendor/maplibre-gl.css": "text/css",
+             "/filtro.js": "application/javascript; charset=utf-8"}
 
 
 class H(BaseHTTPRequestHandler):
@@ -163,6 +291,17 @@ class H(BaseHTTPRequestHandler):
             if p.startswith("/api/datos"):
                 return self.send(200, excel_json(), "application/json; charset=utf-8",
                                  {"Cache-Control": "no-store"})
+            if p.startswith("/api/extensiones"):
+                return self.send(200, extensiones(), "application/json")
+            if p.startswith("/api/lista.xlsx"):
+                return self.send(200, lista_xlsx(),
+                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                 {"Content-Disposition": 'attachment; filename="lista_trabajo_datos.xlsx"'})
+            if p.startswith("/api/lista"):
+                return self.send(200, json.dumps(lista_json(), ensure_ascii=False).encode(),
+                                 "application/json; charset=utf-8", {"Cache-Control": "no-store"})
+            if p.rstrip("/") in ("/trabajo", "/trabajo.html"):
+                return self.send(200, (ROOT / "trabajo.html").read_bytes(), "text/html; charset=utf-8")
             if p in ESTATICOS:
                 return self.send(200, (ROOT / p[1:]).read_bytes(), ESTATICOS[p],
                                  {"Cache-Control": "public, max-age=86400"})
@@ -187,5 +326,8 @@ if __name__ == "__main__":
         if not con_datos:
             print("Aviso: todos los tiles están vacíos. Borra la carpeta cache_tiles y vuelve a "
                   "correr  python descargar_todo.py")
-    print(f"Mapa en http://localhost:{PORT}")
+    if TILE_DIR.exists():  # deja calculadas las extensiones mientras abres el navegador
+        threading.Thread(target=extensiones, daemon=True).start()
+    print(f"Mapa general:   http://localhost:{PORT}")
+    print(f"Mapa de trabajo: http://localhost:{PORT}/trabajo")
     ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()

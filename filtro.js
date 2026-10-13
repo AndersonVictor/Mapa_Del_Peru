@@ -1,0 +1,86 @@
+// Combos Departamento -> Provincia -> Distrito, compartidos por el mapa general y el de trabajo.
+// Los nombres salen de datos.xlsx (/api/datos) y la extensión de cada zona de /api/extensiones.
+(function () {
+  const N = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+  const CAMPO = { 7: 'nombregion', 8: 'nombprov', 9: 'nombdist' };
+  const CAPA = { 7: 'tb_region', 8: 'tb_provincia', 9: 'tb_distrito' };
+  const nombre = (datos, g) => datos[g]?.[CAMPO[g[0]]] || g;
+
+  let ext = null; // se pide una sola vez, recién cuando hace falta
+  const extensiones = () => ext || (ext = fetch('/api/extensiones').then(r => r.json()).catch(() => { ext = null; return {}; }));
+
+  // Acerca el mapa a la zona. Devuelve false si no se conoce su extensión.
+  async function acercar(map, gid) {
+    const b = (await extensiones())[gid];
+    if (!b) return false;
+    map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 50, maxZoom: 12, duration: 900 });
+    return true;
+  }
+
+  // Contorno azul de la zona elegida en el combo (una capa por nivel)
+  const NADA = ['boolean', false];
+  function agregarSeleccion(map, source) {
+    for (const capa of Object.values(CAPA))
+      map.addLayer({ id: 'sel-' + capa, type: 'line', source, 'source-layer': capa, filter: NADA,
+        paint: { 'line-color': '#0b63ce', 'line-width': 3 } });
+  }
+  function marcar(map, gid) {
+    for (const capa of Object.values(CAPA))
+      map.setFilter('sel-' + capa, gid && CAPA[gid[0]] === capa
+        ? ['==', ['to-number', ['get', 'id_geografia']], +gid] : NADA);
+  }
+
+  // opciones: { map, contenedor, datos, area (Set de ids de departamento o null), permitido(gid), alElegir(gid|null) }
+  function crear({ map, contenedor, datos, area = null, permitido = () => true, alElegir }) {
+    const ids = Object.keys(datos);
+    const orden = (a, b) => nombre(datos, a).localeCompare(nombre(datos, b), 'es');
+    const deps = ids.filter(g => g[0] === '7' && (!area || area.has(g))).sort(orden);
+    const provDe = r => ids.filter(g => g[0] === '8' && permitido(g) &&
+      (g.slice(1, 3) === r.slice(1, 3) || N(datos[g].nombregion) === N(datos[r].nombregion))).sort(orden);
+    const distDe = p => ids.filter(g => g[0] === '9' && permitido(g) &&
+      (g.slice(1, 5) === p.slice(1, 5) ||
+       (N(datos[g].nombprov) === N(datos[p].nombprov) && N(datos[g].nombregion) === N(datos[p].nombregion)))).sort(orden);
+
+    contenedor.innerHTML = '';
+    const combo = (texto) => {
+      const s = document.createElement('select');
+      s.setAttribute('aria-label', texto);
+      contenedor.appendChild(s);
+      s.llenar = (lista) => {
+        s.replaceChildren(new Option(texto, ''), ...lista.map(g => new Option(nombre(datos, g), g)));
+        s.disabled = !lista.length;
+      };
+      return s;
+    };
+    const sDep = combo('Departamento (todos)'), sProv = combo('Provincia (todas)'), sDist = combo('Distrito (todos)');
+    sDep.llenar(deps); sProv.llenar([]); sDist.llenar([]);
+
+    const elegir = () => {
+      const gid = sDist.value || sProv.value || sDep.value || null;
+      marcar(map, gid);
+      alElegir?.(gid);
+    };
+    sDep.onchange = () => { sProv.llenar(sDep.value ? provDe(sDep.value) : []); sDist.llenar([]); elegir(); };
+    sProv.onchange = () => { sDist.llenar(sProv.value ? distDe(sProv.value) : []); elegir(); };
+    sDist.onchange = elegir;
+
+    return {
+      reiniciar() { sDep.value = ''; sProv.llenar([]); sDist.llenar([]); marcar(map, null); },
+      // Pone los combos en una zona (p. ej. al hacer clic en la lista del mapa de trabajo)
+      ir(gid) {
+        const dep = gid[0] === '7' ? gid : deps.find(r => (gid[0] === '8' ? provDe(r) : provDe(r).flatMap(distDe)).includes(gid));
+        if (!dep) return false;
+        sDep.value = dep; sProv.llenar(provDe(dep)); sDist.llenar([]);
+        if (gid[0] !== '7') {
+          const prov = gid[0] === '8' ? gid : provDe(dep).find(p => distDe(p).includes(gid));
+          sProv.value = prov || ''; sDist.llenar(prov ? distDe(prov) : []);
+          if (gid[0] === '9') sDist.value = gid;
+        }
+        elegir();
+        return true;
+      }
+    };
+  }
+
+  window.Filtro = { crear, acercar, agregarSeleccion, marcar, extensiones, N, CAPA, nombre };
+})();
