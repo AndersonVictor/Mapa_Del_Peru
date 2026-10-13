@@ -1,9 +1,9 @@
-"""Servidor local: sirve index.html y hace de proxy hacia INEI (tiles PBF + tooltip).
-Renueva solo el token (dura 300 s). Uso:  python server.py  ->  http://localhost:8000
+"""Servidor 100% local: sirve el mapa desde cache_tiles/ y los textos desde datos.xlsx.
+NO consulta al INEI mientras navegas.  Uso:  python server.py  ->  http://localhost:8000
 
-Los textos del tooltip salen de datos.xlsx (si existe). Puedes editar ese Excel,
-guardarlo y recargar la página: los cambios se ven sin reiniciar el servidor.
-Para crear o completar el Excel con los datos del INEI:  python actualizar_excel.py
+Antes, una sola vez, descarga todo con:  python descargar_todo.py
+Las funciones de descarga (token, fetch_tile, fetch_tooltip) solo las usan los scripts
+descargar_todo.py y actualizar_excel.py.
 """
 import json, re, threading, time, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -97,6 +97,26 @@ def excel_json():
         return _excel["json"]
 
 
+def tile_local(z, x, y):
+    """Tile desde memoria o disco. Nunca va al INEI: si no está descargado devuelve None."""
+    key = (z, x, y)
+    if key not in _tile_cache:
+        path = TILE_DIR / str(z) / str(x) / f"{y}.pbf"
+        if not path.exists():
+            return None
+        _tile_cache[key] = path.read_bytes()
+    return _tile_cache[key]
+
+
+def zoom_maximo():
+    zs = [int(d.name) for d in TILE_DIR.iterdir() if d.name.isdigit()] if TILE_DIR.exists() else []
+    return max(zs, default=0)
+
+
+ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
+             "/vendor/maplibre-gl.css": "text/css"}
+
+
 class H(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"  # mantiene la conexión abierta entre tiles
 
@@ -114,15 +134,19 @@ class H(BaseHTTPRequestHandler):
         try:
             m = re.match(r"/tiles/(\d+)/(\d+)/(\d+)\.pbf", p)
             if m:
-                z, x, y = map(int, m.groups())
-                return self.send(200, fetch_tile(z, x, y), "application/x-protobuf",
+                data = tile_local(*map(int, m.groups()))
+                if not data:  # fuera de Perú o no descargado: tile vacío
+                    return self.send(204, b"", "application/x-protobuf")
+                return self.send(200, data, "application/x-protobuf",
                                  {"Cache-Control": "public, max-age=86400"})
-            m = re.match(r"/api/tooltip\?id=(\d{7})", p)
-            if m:
-                return self.send(200, fetch_tooltip(m.group(1)), "application/json")
+            if p.startswith("/api/config"):
+                return self.send(200, json.dumps({"maxzoom": zoom_maximo()}).encode(), "application/json")
             if p.startswith("/api/datos"):
                 return self.send(200, excel_json(), "application/json; charset=utf-8",
                                  {"Cache-Control": "no-store"})
+            if p in ESTATICOS:
+                return self.send(200, (ROOT / p[1:]).read_bytes(), ESTATICOS[p],
+                                 {"Cache-Control": "public, max-age=86400"})
             if p in ("/", "/index.html"):
                 return self.send(200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
             self.send(404, b"not found", "text/plain")
@@ -134,7 +158,9 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    if not EXCEL.exists():
-        print("Aviso: no existe datos.xlsx. Créalo con:  python actualizar_excel.py")
+    if not TILE_DIR.exists() or not EXCEL.exists():
+        print("Aviso: faltan los datos locales. Descárgalos una vez con:  python descargar_todo.py")
+    else:
+        print(f"Modo local: tiles hasta zoom {zoom_maximo()}, sin consultas al INEI.")
     print(f"Mapa en http://localhost:{PORT}")
     ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()

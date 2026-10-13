@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mapa del Perú - Censo 2025</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
+<link rel="stylesheet" href="/vendor/maplibre-gl.css">
 <style>
   html, body, #map { margin: 0; height: 100%; background: #eef2f5; font-family: system-ui, sans-serif; }
   #tip { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: none; display: none; z-index: 5; min-width: 210px;
@@ -22,7 +22,7 @@
 <div id="map"></div>
 <div id="lvl">Nivel: Departamento</div>
 <div id="tip"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script src="/vendor/maplibre-gl.js"></script>
 <script>
 const map = new maplibregl.Map({
   container: 'map',
@@ -42,10 +42,12 @@ const levelOf = z => z < 6 ? 'tb_region' : z < 8 ? 'tb_provincia' : 'tb_distrito
 const levelName = { tb_region: 'Departamento', tb_provincia: 'Provincia', tb_distrito: 'Distrito' };
 const levelZoom = { tb_region: [0, 6], tb_provincia: [6, 8], tb_distrito: [8, 24] };
 
-map.on('load', () => {
+map.on('load', async () => {
+  // Zoom máximo descargado en cache_tiles/; más allá, MapLibre amplía esos mismos tiles
+  const { maxzoom } = await fetch('/api/config').then(r => r.json());
   // promoteId: el id_geografia pasa a ser el id de cada polígono -> resaltado con feature-state
   map.addSource('inei', { type: 'vector', tiles: [location.origin + '/tiles/{z}/{x}/{y}.pbf'],
-    scheme: 'tms', minzoom: 0, maxzoom: 12,
+    scheme: 'tms', minzoom: 0, maxzoom: maxzoom || 10,
     promoteId: { tb_region: 'id_geografia', tb_provincia: 'id_geografia', tb_distrito: 'id_geografia' } });
 
   const line = (id, layer, color, w, minzoom = 0) => map.addLayer({
@@ -80,16 +82,9 @@ function setHighlight(layer, id) {
 const tip = document.getElementById('tip');
 const lvl = document.getElementById('lvl');
 
-// Textos del tooltip: se cargan una sola vez desde datos.xlsx (vía /api/datos).
-// Si un id no está en el Excel, se pide al INEI como antes.
-let excel = {};
-fetch('/api/datos').then(r => r.json()).then(d => { excel = d; }).catch(() => {});
-const cache = new Map();
-function loadTip(id) {
-  if (excel[id]) return Promise.resolve(excel[id]);
-  if (!cache.has(id)) cache.set(id, fetch('/api/tooltip?id=' + id).then(r => r.json()).then(j => j.data));
-  return cache.get(id);
-}
+// Textos del tooltip: se cargan una sola vez desde datos.xlsx (vía /api/datos). Todo local.
+const excel = fetch('/api/datos').then(r => r.json()).catch(() => ({}));
+const loadTip = id => excel.then(d => d[id]);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function render(d) {

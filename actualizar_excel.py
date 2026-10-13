@@ -5,7 +5,7 @@
 
 Los ids se sacan de los tiles del mapa (capa tb_distrito) y los datos de la API de tooltip del INEI.
 """
-import gzip, json, math, sys
+import gzip, json, math, sys, time
 from concurrent.futures import ThreadPoolExecutor
 
 from openpyxl import Workbook, load_workbook
@@ -115,7 +115,9 @@ def ids_geografia():
 
 def bajar(gid):
     try:
-        return gid, json.loads(fetch_tooltip(gid))["data"] or {}
+        d = json.loads(fetch_tooltip(gid))["data"] or {}
+        time.sleep(0.1)  # sin apuro, para no cargar al INEI
+        return gid, d
     except Exception as e:
         print(f"  sin datos para {gid}: {e}")
         return gid, None
@@ -136,7 +138,7 @@ def main():
     faltan = [g for g in ids_geografia() if g not in existentes]
     print(f"{len(existentes)} filas ya en el Excel, faltan {len(faltan)}. Descargando...")
     nuevos = {}
-    with ThreadPoolExecutor(8) as ex:
+    with ThreadPoolExecutor(4) as ex:
         for k, (gid, d) in enumerate(ex.map(bajar, faltan), 1):
             if d is not None:
                 nuevos[gid] = d
