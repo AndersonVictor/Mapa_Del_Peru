@@ -117,6 +117,16 @@ def zoom_maximo():
     return max(zs, default=0)
 
 
+def resumen_tiles():
+    """Cuántos tiles hay en disco y cuántos tienen datos (los vacíos son zonas fuera de Perú)."""
+    total = con_datos = 0
+    if TILE_DIR.exists():
+        for f in TILE_DIR.rglob("*.pbf"):
+            total += 1
+            con_datos += f.stat().st_size > 0
+    return total, con_datos
+
+
 ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
              "/vendor/maplibre-gl.css": "text/css"}
 
@@ -141,10 +151,15 @@ class H(BaseHTTPRequestHandler):
                 data = tile_local(*map(int, m.groups()))
                 if not data:  # fuera de Perú o no descargado: tile vacío
                     return self.send(204, b"", "application/x-protobuf")
-                return self.send(200, data, "application/x-protobuf",
-                                 {"Cache-Control": "public, max-age=86400"})
+                extra = {"Cache-Control": "public, max-age=86400"}
+                if data[:2] == b"\x1f\x8b":  # tile comprimido: que el navegador lo descomprima
+                    extra["Content-Encoding"] = "gzip"
+                return self.send(200, data, "application/x-protobuf", extra)
             if p.startswith("/api/config"):
-                return self.send(200, json.dumps({"maxzoom": zoom_maximo()}).encode(), "application/json")
+                total, con_datos = resumen_tiles()
+                cfg = {"maxzoom": zoom_maximo(), "tiles": total, "tiles_con_datos": con_datos,
+                       "excel": EXCEL.exists()}
+                return self.send(200, json.dumps(cfg).encode(), "application/json")
             if p.startswith("/api/datos"):
                 return self.send(200, excel_json(), "application/json; charset=utf-8",
                                  {"Cache-Control": "no-store"})
@@ -155,7 +170,8 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
             self.send(404, b"not found", "text/plain")
         except Exception as e:
-            self.send(502, str(e).encode(), "text/plain")
+            print(f"Error en {p}: {e!r}")
+            self.send(500, str(e).encode(), "text/plain")
 
     def log_message(self, *a):
         pass
@@ -165,6 +181,11 @@ if __name__ == "__main__":
     if not TILE_DIR.exists() or not EXCEL.exists():
         print("Aviso: faltan los datos locales. Descárgalos una vez con:  python descargar_todo.py")
     else:
-        print(f"Modo local: tiles hasta zoom {zoom_maximo()}, sin consultas al INEI.")
+        total, con_datos = resumen_tiles()
+        print(f"Modo local: {total} tiles ({con_datos} con datos) hasta zoom {zoom_maximo()}, "
+              "sin consultas al INEI.")
+        if not con_datos:
+            print("Aviso: todos los tiles están vacíos. Borra la carpeta cache_tiles y vuelve a "
+                  "correr  python descargar_todo.py")
     print(f"Mapa en http://localhost:{PORT}")
     ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
