@@ -38,6 +38,19 @@ Muestra solo las zonas de `lista_trabajo.xlsx` (columnas `NOMBRE`, `NIVEL`, `DEP
 - Los nombres se buscan en `datos.xlsx` sin importar tildes ni Ñ. Si alguno sale con ⚠ *no encontrado*, revisa cómo está escrito.
 - Edita la lista, guarda y recarga la página (F5).
 
+### Modo ⚖️ Jueces (botón arriba del panel)
+
+Lee `jueces.xlsx` (el modelo del Power BI de la CSJ Junín):
+
+- **Provincias**: color según el total de jueces de la hoja `Provincias` (los mismos números de la medida RESUMEN).
+- **Burbujas por sede (distrito)**: se cuentan de la hoja `Data_Plana` (columna `SEDE_LOCALIDAD`) y se ubican
+  con las coordenadas de `DimDependencia`. Tamaño = cantidad de jueces.
+- Tooltip con el mismo orden que el RESUMEN: total, varones/mujeres, por condición y por instancia
+  (se personaliza en `tooltip.js`, función `tooltipJuecesHTML`).
+- En el panel: resumen de la CSJJ, ranking por provincia (clic = acercar) y **avisos** si las hojas no cuadran
+  entre sí o si una sede no se encuentra en el mapa.
+- Reemplaza `jueces.xlsx` por tu versión nueva (mismas hojas y columnas) y recarga la página.
+
 ## Editar los textos del tooltip (datos.xlsx)
 
 - Una fila por departamento (id 7…), provincia (id 8…) y distrito (id 9…).
