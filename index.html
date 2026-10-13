@@ -15,7 +15,9 @@
   #tip .big { font-size: 20px; font-weight: 700; color: #c8102e; }
   #tip .row { display: flex; justify-content: space-between; gap: 12px; }
   #lvl { position: absolute; top: 10px; left: 10px; z-index: 5; background: #fff; border-radius: 6px;
-    padding: 6px 10px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.2); }
+    padding: 6px 10px; font-size: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.2); display: flex; gap: 8px; align-items: center; }
+  #home { font: inherit; border: 1px solid #ccc; background: #fff; border-radius: 4px; padding: 2px 8px; cursor: pointer; }
+  #home:hover { background: #f3f3f3; }
   #aviso { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); z-index: 9; display: none;
     max-width: min(560px, calc(100% - 32px)); background: #fff3cd; color: #5c4400; border: 1px solid #e0b84c;
     border-radius: 8px; padding: 10px 14px; font-size: 14px; line-height: 1.5; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
@@ -24,7 +26,7 @@
 </head>
 <body>
 <div id="map"></div>
-<div id="lvl">Nivel: Departamento</div>
+<div id="lvl"><span id="lvl-txt">Nivel: Departamento</span> <button id="home" title="Ver todo el Perú">⟲ Perú</button></div>
 <div id="tip"></div>
 <div id="aviso"></div>
 <script>
@@ -39,10 +41,11 @@ if (location.protocol === 'file:')
 if (typeof maplibregl === 'undefined' && location.protocol !== 'file:')
   aviso('No cargó la librería del mapa (<code>vendor/maplibre-gl.js</code>). Haz <code>git pull</code> ' +
         'y revisa que exista la carpeta <code>vendor/</code> junto a server.py.');
+const PERU = [[-81.5, -18.5], [-68.5, 0.2]];
 const map = new maplibregl.Map({
   container: 'map',
   style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#eef2f5' } }] },
-  bounds: [[-81.5, -18.5], [-68.5, 0.2]],
+  bounds: PERU,
   fitBoundsOptions: { padding: 20 },
   maxZoom: 14,
   minZoom: 3,
@@ -103,7 +106,7 @@ function setHighlight(layer, id) {
 }
 
 const tip = document.getElementById('tip');
-const lvl = document.getElementById('lvl');
+const lvl = document.getElementById('lvl-txt');
 
 // Textos del tooltip: se cargan una sola vez desde datos.xlsx (vía /api/datos). Todo local.
 const excel = fetch('/api/datos').then(r => r.json()).catch(() => ({}));
@@ -136,18 +139,29 @@ function clear() {
   map.getCanvas().style.cursor = '';
 }
 
-function update(pt) {
-  if (!map.getLayer('f-dist')) return;
+// Zona bajo el puntero según el nivel del zoom actual: { layer, gid } o null
+function pick(pt) {
+  if (!map.getLayer('f-dist')) return null;
   const layer = levelOf(map.getZoom());
   const hit = map.queryRenderedFeatures(pt, { layers: ['f-dist'] })[0];
-  if (!hit) return clear();
-  map.getCanvas().style.cursor = 'pointer';
+  if (!hit) { // sin distrito bajo el puntero: se usa directo la capa del nivel
+    const h = map.queryRenderedFeatures(pt, { layers: ['h-' + layer] })[0];
+    return h && h.properties.id_geografia ? { layer, gid: +h.properties.id_geografia } : null;
+  }
   // El distrito trae ccdd/ccpp, de ahí se derivan los ids de provincia y región
   // id_geografia del nivel: distrito 9xxxxxx; prov 8 + ccdd+ccpp; región 7 + ccdd
   const p = hit.properties;
   const gid = layer === 'tb_distrito' ? +p.id_geografia
             : layer === 'tb_provincia' ? +('8' + p.ccdd + p.ccpp + '00')
             : +('7' + p.cod_region + '0000');
+  return { layer, gid };
+}
+
+function update(pt) {
+  const t = pick(pt);
+  if (!t) return clear();
+  map.getCanvas().style.cursor = 'pointer';
+  const { layer, gid } = t;
   if (gid !== current || layer !== curLayer) {
     current = gid; curLayer = layer;
     setHighlight(layer, gid);
@@ -165,11 +179,41 @@ function schedule(pt) {
   lastPoint = pt;
   if (pending) return;
   pending = true;
-  requestAnimationFrame(() => { pending = false; update(lastPoint); });
+  requestAnimationFrame(() => { pending = false; if (lastPoint) update(lastPoint); });
 }
 map.on('mousemove', e => schedule(e.point));
-map.on('click', e => schedule(e.point)); // en celular/tablet el toque muestra el tooltip
-map.on('mouseout', clear);
+// Clic = acercarse a esa zona, como en el INEI: departamento -> sus provincias -> sus distritos
+const siguienteNivel = { tb_region: 6.2, tb_provincia: 8.2, tb_distrito: 0 }; // zoom mínimo al llegar
+
+function extension(layer, gid) {
+  // Une los pedazos del polígono que están en los tiles cargados (cada tile trae solo su parte)
+  const fs = map.querySourceFeatures('inei', { sourceLayer: layer,
+    filter: ['==', ['to-number', ['get', 'id_geografia']], gid] });
+  let b = null;
+  const walk = c => {
+    if (typeof c[0] === 'number') { b = b ? b.extend(c) : new maplibregl.LngLatBounds(c, c); return; }
+    c.forEach(walk);
+  };
+  fs.forEach(f => walk(f.geometry.coordinates));
+  return b;
+}
+
+function acercar(pt, lngLat) {
+  const t = pick(pt);
+  if (!t) return;
+  const b = extension(t.layer, t.gid);
+  const cam = b ? map.cameraForBounds(b, { padding: 40 }) : { center: lngLat, zoom: map.getZoom() + 2 };
+  if (!cam) return;
+  const zoom = Math.min(Math.max(cam.zoom, siguienteNivel[t.layer]), 13);
+  if (zoom < map.getZoom() + 0.1) return; // ya estás encima de esa zona: el clic nunca aleja
+  clear();
+  map.flyTo({ center: cam.center, zoom, duration: 900, essential: true });
+}
+
+map.on('click', e => { acercar(e.point, e.lngLat); schedule(e.point); }); // en celular el toque también muestra el tooltip
+map.on('moveend', () => { if (lastPoint && matchMedia('(hover: hover)').matches) schedule(lastPoint); });
+document.getElementById('home').onclick = () => { clear(); map.fitBounds(PERU, { padding: 20, duration: 900 }); };
+map.on('mouseout', () => { lastPoint = null; clear(); });
 map.on('movestart', () => { if (!matchMedia('(hover: hover)').matches) clear(); });
 </script>
 </body>

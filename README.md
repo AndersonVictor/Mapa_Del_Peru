@@ -19,6 +19,11 @@ python server.py             # abre http://localhost:8000
   amplía los mismos tiles. La librería del mapa (MapLibre) también está en `vendor/`,
   así que funciona incluso sin internet.
 
+## Navegar
+
+- **Clic** en una zona = acercarse a ella, como en el INEI: departamento → sus provincias → sus distritos.
+- Botón **⟲ Perú** (arriba a la izquierda) = volver a ver todo el país.
+
 ## Editar los textos del tooltip (datos.xlsx)
 
 - Una fila por departamento (id 7…), provincia (id 8…) y distrito (id 9…).
