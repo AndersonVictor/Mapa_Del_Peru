@@ -88,13 +88,19 @@ def resumen(ruta, datos, cajas):
         provincias[gid] = p
     csjj = {c: sum(p[c] for p in provincias.values()) for c in CAMPOS}
 
-    # 2) Coordenadas de los órganos, promediadas por distrito
-    coords = defaultdict(list)
+    # 2) Coordenadas de los órganos. Solo valen las que caen dentro de su distrito:
+    #    hay errores de tipeo (ej. -7517.975 en vez de -75.17975) que mandaban la burbuja a otro lado.
+    coords, malas = defaultdict(list), defaultdict(int)
     for f in tabla(wb[hojas["DIMDEPENDENCIA"]], "ID DEP") if "DIMDEPENDENCIA" in hojas else []:
         gid = buscar("9", f.get("DISTRITO"), f.get("DEPARTAMENTO"), f.get("PROVINCIA"))
         lat, lon = f.get("LATITUD DECIMAL"), f.get("LONGITUD DECIMAL")
-        if gid and isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+        if not gid or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+            continue
+        c = cajas.get(gid)
+        if c and c[0] - 0.01 <= lon <= c[2] + 0.01 and c[1] - 0.01 <= lat <= c[3] + 0.01:
             coords[gid].append((lon, lat))
+        else:
+            malas[f"{f.get('DISTRITO')} ({f.get('PROVINCIA')})"] += 1
 
     # 3) Data_Plana: cada magistrado suma en el distrito de su sede
     sedes, sin_ubicar, por_prov = {}, defaultdict(int), defaultdict(int)
@@ -120,12 +126,14 @@ def resumen(ruta, datos, cajas):
         s["jesp"] += tipo.startswith("J ESP")
         s["jpl"] += tipo == "JPL"
     for gid, s in sedes.items():
-        pts = coords.get(gid)
-        if pts:
-            s["lon"], s["lat"] = sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
-        elif gid in cajas:
-            c = cajas[gid]
-            s["lon"], s["lat"] = (c[0] + c[2]) / 2, (c[1] + c[3]) / 2
+        pts, c = coords.get(gid), cajas.get(gid)
+        if pts:  # la mediana: un dato raro no la mueve
+            s["lon"] = sorted(p[0] for p in pts)[len(pts) // 2]
+            s["lat"] = sorted(p[1] for p in pts)[len(pts) // 2]
+        elif c:  # sin coordenadas buenas: al centro del distrito
+            s["lon"], s["lat"] = (c[4], c[5]) if len(c) >= 6 else ((c[0] + c[2]) / 2, (c[1] + c[3]) / 2)
+    for k, n in malas.items():
+        avisos.append(f"DimDependencia: {n} coordenada(s) de {k} caen fuera de su distrito (se ignoraron).")
     for k, n in sin_ubicar.items():
         avisos.append(f"Sede '{k}': {n} magistrado(s) sin distrito que coincida en datos.xlsx (no salen como burbuja).")
     for gid, p in provincias.items():
