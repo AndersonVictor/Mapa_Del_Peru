@@ -106,6 +106,15 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-ri
 
 let J = {}, modo = 'poblacion';
 let datos = {}, regIds = new Set(), provIds = new Set(), distIds = new Set(), filtro = null;
+const fullRegs = new Set(), hidProv = new Set(), hidDist = new Set();
+// ¿Se dibuja esta zona? (departamento TODO, o en la lista, y no marcada con OCULTAR)
+function visible(g) {
+  const dep = [...fullRegs].some(r => r.slice(1, 3) === g.slice(1, 3));
+  if (g[0] === '7') return regIds.has(g);
+  if (g[0] === '8') return !hidProv.has(g) && (dep || provIds.has(g));
+  const prov = '8' + g.slice(1, 5) + '00';
+  return !hidDist.has(g) && !hidProv.has(prov) && (dep || provIds.has(prov) || distIds.has(g));
+}
 
 map.on('load', async () => {
   const [d, lista, cfg] = await Promise.all([
@@ -118,8 +127,15 @@ map.on('load', async () => {
   if (!Object.keys(datos).length) aviso('Falta <b>datos.xlsx</b>. Corre <code>python actualizar_excel.py</code>.');
   if (!lista.length) aviso('Falta <b>lista_trabajo.xlsx</b> junto a server.py (o está vacía).');
 
-  const enArea = lista.filter(f => f.en_area && f.id);
-  for (const f of enArea) ({ 7: regIds, 8: provIds, 9: distIds })[f.id[0]].add(f.id);
+  // Qué se dibuja (lista_trabajo.xlsx):
+  //  - departamento con MOSTRAR = TODO       -> completo
+  //  - departamento con MOSTRAR = SOLO LISTA -> solo sus provincias/distritos de la lista
+  //  - cualquier fila con OCULTAR = SI       -> esa zona no se dibuja (excepción)
+  for (const f of lista.filter(f => f.en_area && f.id)) {
+    const [ids, ocultos] = { 7: [regIds, null], 8: [provIds, hidProv], 9: [distIds, hidDist] }[f.id[0]];
+    if (f.ocultar && ocultos) ocultos.add(f.id); else ids.add(f.id);
+    if (f.id[0] === '7' && f.mostrar !== 'SOLO LISTA') fullRegs.add(f.id);
+  }
   pintarLista(lista);
 
   // Expresiones sobre las propiedades del distrito en los tiles
@@ -127,10 +143,15 @@ map.on('load', async () => {
   const REG = ['to-number', ['coalesce', ['get', 'cod_region'], ['get', 'ccdd']]];
   const PROV = ['+', ['*', ['to-number', ['get', 'ccdd']], 100], ['to-number', ['get', 'ccpp']]];
   const lit = (xs) => ['literal', [...xs]];
-  const regCod = [...regIds].map(g => +g.slice(1, 3));
+  const num = xs => [...xs].map(Number);
+  const fullCod = [...fullRegs].map(g => +g.slice(1, 3));
   const provCod = [...provIds].map(g => +g.slice(1, 5));
-  const dentro = ['in', REG, lit(regCod)];
   const depDe = ['%', ['floor', ['/', ID, 10000]], 100]; // id 7/8/9 + ccdd... -> ccdd
+  // Distritos que se dibujan (misma regla que visible() más abajo)
+  const dentro = ['all',
+    ['any', ['in', REG, lit(fullCod)], ['in', PROV, lit(provCod)], ['in', ID, lit(num(distIds))]],
+    ['!', ['in', PROV, lit([...hidProv].map(g => +g.slice(1, 5)))]],
+    ['!', ['in', ID, lit(num(hidDist))]]];
 
   map.addSource('inei', { type: 'vector', tiles: [location.origin + '/tiles/{z}/{x}/{y}.pbf'],
     scheme: 'tms', minzoom: 0, maxzoom: cfg.maxzoom || 10,
@@ -143,15 +164,16 @@ map.on('load', async () => {
   // Solo se dibujan los departamentos de la lista; afuera no hay nada
   fill('f-area', 'tb_distrito', dentro, '#f4f1ea');
   fill('f-prov', 'tb_distrito', ['all', dentro, ['in', PROV, lit(provCod)]], '#fcd34d', 0.6);
-  fill('f-dist', 'tb_distrito', ['in', ID, lit([...distIds].map(Number))], '#a78bfa', 0.75);
+  fill('f-dist', 'tb_distrito', ['all', dentro, ['in', ID, lit(num(distIds))]], '#a78bfa', 0.75);
   // ⚖️ Jueces: provincias coloreadas por total (hoja Provincias de jueces.xlsx)
   const colores = ['match', PROV];
   for (const [gid, p] of Object.entries(J.provincias || {})) colores.push(+gid.slice(1, 5), colorJueces(p.total));
   fill('j-prov', 'tb_distrito', dentro, colores.length > 2 ? [...colores, '#f4f1ea'] : '#f4f1ea');
   map.setLayoutProperty('j-prov', 'visibility', 'none');
   line('l-dist', 'tb_distrito', dentro, '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 6, 0.3, 10, 0.9]);
-  line('l-prov', 'tb_provincia', ['in', depDe, lit(regCod)], '#6b6458', ['interpolate', ['linear'], ['zoom'], 6, 0.9, 10, 1.8]);
-  line('l-reg', 'tb_region', ['in', ID, lit([...regIds].map(Number))], '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 6, 1.8, 10, 3]);
+  line('l-prov', 'tb_provincia', ['all', ['any', ['in', depDe, lit(fullCod)], ['in', ID, lit(num(provIds))]],
+    ['!', ['in', ID, lit(num(hidProv))]]], '#6b6458', ['interpolate', ['linear'], ['zoom'], 6, 0.9, 10, 1.8]);
+  line('l-reg', 'tb_region', ['in', ID, lit(num(fullRegs))], '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 6, 1.8, 10, 3]);
 
   const on = ['boolean', ['feature-state', 'hover'], false];
   for (const capa of ['tb_region', 'tb_provincia', 'tb_distrito']) {
@@ -175,15 +197,32 @@ map.on('load', async () => {
   setModo(guardado === 'jueces' ? 'jueces' : 'poblacion');
 
   // En los combos solo aparece lo de la lista (una provincia de la lista muestra todos sus distritos)
+  // Combos: lo de la lista que se ve (una provincia aparece también si tiene un distrito suelto visible, ej. Palca)
   const permitido = g => g[0] === '8'
-    ? provIds.has(g) || [...distIds].some(x => x.slice(1, 5) === g.slice(1, 5))
-    : distIds.has(g) || provIds.has('8' + g.slice(1, 5) + '00');
-  filtro = Filtro.crear({ map, contenedor: document.getElementById('combos'), datos, area: regIds, permitido, etiquetasIniciales: true,
-    alElegir: gid => { marcarLista(gid); gid ? Filtro.acercar(map, gid) : verTodo(); } });
-
-  // Encuadre exacto de los departamentos y no dejar irse lejos
+    ? (visible(g) && provIds.has(g)) || [...distIds].some(x => visible(x) && x.slice(1, 5) === g.slice(1, 5))
+    : visible(g) && (distIds.has(g) || provIds.has('8' + g.slice(1, 5) + '00'));
+  // Sin elegir nada: nombres de las provincias que se ven, y de los distritos sueltos (ej. Palca)
+  const iniciales = () => Object.keys(datos).filter(g => g[0] === '8' && visible(g))
+    .concat([...distIds].filter(g => visible(g) && !visible('8' + g.slice(1, 5) + '00')));
   const ext = await Filtro.extensiones();
-  const cajas = [...regIds].map(g => ext[g]).filter(Boolean);
+  // Un departamento SOLO LISTA se encuadra en lo que se ve, no en todo el departamento
+  const cajaDe = ids => {
+    const cs = ids.map(g => ext[g]).filter(Boolean);
+    return cs.length ? [[Math.min(...cs.map(c => c[0])), Math.min(...cs.map(c => c[1]))],
+                        [Math.max(...cs.map(c => c[2])), Math.max(...cs.map(c => c[3]))]] : null;
+  };
+  const visiblesDe = dep => [...provIds, ...distIds].filter(g => g.slice(1, 3) === dep.slice(1, 3) && visible(g));
+  filtro = Filtro.crear({ map, contenedor: document.getElementById('combos'), datos, area: regIds, permitido,
+    rotulable: visible, etiquetasIniciales: iniciales,
+    alElegir: gid => {
+      marcarLista(gid);
+      if (!gid) return verTodo();
+      const caja = gid[0] === '7' && !fullRegs.has(gid) && cajaDe(visiblesDe(gid));
+      caja ? map.fitBounds(caja, { padding: 40, duration: 900 }) : Filtro.acercar(map, gid);
+    } });
+
+  // Encuadre exacto de lo que se ve y no dejar irse lejos
+  const cajas = [...fullRegs, ...provIds, ...distIds].filter(visible).map(g => ext[g]).filter(Boolean);
   if (cajas.length) {
     AREA = [[Math.min(...cajas.map(c => c[0])), Math.min(...cajas.map(c => c[1]))],
             [Math.max(...cajas.map(c => c[2])), Math.max(...cajas.map(c => c[3]))]];
@@ -262,15 +301,17 @@ const NIV = { DEPARTAMENTO: 0, PROVINCIA: 1, DISTRITO: 2 };
 function pintarLista(lista) {
   const cont = document.getElementById('lista');
   const dentro = lista.filter(f => f.en_area), fuera = lista.filter(f => !f.en_area);
-  const nProv = dentro.filter(f => Filtro.N(f.nivel) === 'PROVINCIA').length;
-  const nDist = dentro.filter(f => Filtro.N(f.nivel) === 'DISTRITO').length;
+  const nProv = dentro.filter(f => !f.ocultar && Filtro.N(f.nivel) === 'PROVINCIA').length;
+  const nDist = dentro.filter(f => !f.ocultar && Filtro.N(f.nivel) === 'DISTRITO').length;
   const item = f => {
     const niv = Filtro.N(f.nivel);
-    const cls = !f.en_area ? 'fuera' : f.id ? '' : 'falta';
+    const cls = !f.en_area || f.ocultar ? 'fuera' : f.id ? '' : 'falta';
     const extra = f.provincia && niv === 'DISTRITO' ? ` <small>· ${esc(f.provincia)}</small>` : '';
     const falta = f.en_area && !f.id ? ' <small>⚠ no encontrado en datos.xlsx</small>' : '';
-    const fueraTxt = !f.en_area ? ` <small>· ${esc(f.departamento)}</small>` : '';
-    return `<li class="${cls}" data-id="${esc(f.id || '')}"><span class="niv n-${esc(niv)}">${esc(niv.slice(0, 4))}</span>` +
+    const fueraTxt = !f.en_area ? ` <small>· ${esc(f.departamento)}</small>`
+                   : f.ocultar ? ' <small>· oculto (OCULTAR = SI)</small>'
+                   : niv === 'DEPARTAMENTO' && f.mostrar === 'SOLO LISTA' ? ' <small>· solo lo de la lista</small>' : '';
+    return `<li class="${cls}" data-id="${esc(f.ocultar ? '' : f.id || '')}"><span class="niv n-${esc(niv)}">${esc(niv.slice(0, 4))}</span>` +
            `<span>${esc(f.nombre)}${extra}${fueraTxt}${falta}</span></li>`;
   };
   const orden = (a, b) => (NIV[Filtro.N(a.nivel)] ?? 9) - (NIV[Filtro.N(b.nivel)] ?? 9) || a.nombre.localeCompare(b.nombre, 'es');

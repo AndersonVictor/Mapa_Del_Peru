@@ -25,7 +25,7 @@ python server.py             # abre http://localhost:8000
 - Botón **⟲ Perú** (arriba a la izquierda) = volver a ver todo el país.
 
 - **Combos Departamento → Provincia → Distrito** (arriba a la izquierda): eligen una zona, la marcan en azul y acercan el mapa.
-- **Nombres en el mapa**: al elegir un departamento aparecen los nombres de sus provincias; al elegir una provincia,
+- **Nombres en el mapa**: sin elegir nada se ven los departamentos; al elegir un departamento aparecen los nombres de sus provincias; al elegir una provincia,
   los de sus distritos (el distrito elegido en azul). Si dos nombres se tapan, se oculta el de la zona más chica
   y reaparece al acercar. En el mapa de trabajo se ven las provincias desde el inicio.
 
@@ -39,6 +39,11 @@ Muestra solo las zonas de `lista_trabajo.xlsx` (columnas `NOMBRE`, `NIVEL`, `DEP
 - Clic en el mapa o en la lista del panel = acercarse a esa zona. Los combos solo ofrecen lo que está en la lista.
 - **Descargar Excel**: la lista con los datos de `datos.xlsx` (población, hombres, mujeres, densidad).
 - Los nombres se buscan en `datos.xlsx` sin importar tildes ni Ñ. Si alguno sale con ⚠ *no encontrado*, revisa cómo está escrito.
+- **Qué se dibuja** (columnas de `lista_trabajo.xlsx`, explicado también en su hoja `LEEME`):
+  - `MOSTRAR` en filas DEPARTAMENTO: `TODO` = completo (Junín); `SOLO LISTA` = solo sus provincias/distritos de la
+    lista (Huancavelica: Acobamba, Churcampa, Tayacaja y Palca).
+  - `OCULTAR = SI` en una fila PROVINCIA o DISTRITO = excepción: esa zona no se dibuja.
+  - Para agregar una zona, agrega su fila; para quitarla, bórrala o pon `OCULTAR = SI`.
 - Edita la lista, guarda y recarga la página (F5).
 
 ### Modo ⚖️ Jueces (botón arriba del panel)
