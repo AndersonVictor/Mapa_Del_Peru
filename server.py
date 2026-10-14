@@ -298,6 +298,14 @@ ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
              "/tooltip.js": "application/javascript; charset=utf-8"}
 
 
+def pagina(nombre):
+    """HTML con ?v=<fecha> en filtro.js y tooltip.js: si cambian, el navegador baja la versión nueva."""
+    html = (ROOT / nombre).read_text(encoding="utf-8")
+    for js in ("filtro.js", "tooltip.js"):
+        html = html.replace(f'src="/{js}"', f'src="/{js}?v={int((ROOT / js).stat().st_mtime)}"')
+    return html.encode("utf-8")
+
+
 class H(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"  # mantiene la conexión abierta entre tiles
 
@@ -342,13 +350,14 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, json.dumps(lista_json(), ensure_ascii=False).encode(),
                                  "application/json; charset=utf-8", {"Cache-Control": "no-store"})
             if p.rstrip("/") in ("/trabajo", "/trabajo.html"):
-                return self.send(200, (ROOT / "trabajo.html").read_bytes(), "text/html; charset=utf-8")
-            if p in ESTATICOS:
+                return self.send(200, pagina("trabajo.html"), "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
+            ruta = p.split("?")[0]
+            if ruta in ESTATICOS:
                 # MapLibre no cambia: se guarda un día. filtro.js / tooltip.js sí cambian: siempre frescos
-                cache = "public, max-age=86400" if p.startswith("/vendor/") else "no-cache"
-                return self.send(200, (ROOT / p[1:]).read_bytes(), ESTATICOS[p], {"Cache-Control": cache})
+                cache = "public, max-age=86400" if ruta.startswith("/vendor/") else "no-cache"
+                return self.send(200, (ROOT / ruta[1:]).read_bytes(), ESTATICOS[ruta], {"Cache-Control": cache})
             if p in ("/", "/index.html"):
-                return self.send(200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
+                return self.send(200, pagina("index.html"), "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
             self.send(404, b"not found", "text/plain")
         except Exception as e:
             print(f"Error en {p}: {e!r}")
