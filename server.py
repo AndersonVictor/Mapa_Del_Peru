@@ -209,7 +209,7 @@ def leer_lista():
         d = dict(zip(cab, fila))
         if d.get("NOMBRE"):
             out.append({k: str(d.get(k.upper()) or "").strip()
-                        for k in ("nombre", "nivel", "departamento", "provincia")})
+                        for k in ("nombre", "nivel", "departamento", "provincia", "mostrar", "ocultar")})
     return out
 
 
@@ -238,6 +238,9 @@ def lista_json():
     area = {norm(f["nombre"]) for f in filas if norm(f["nivel"]) == "DEPARTAMENTO"}
     for f in filas:
         f["en_area"] = norm(f["departamento"] or f["nombre"]) in area
+        f["ocultar"] = norm(f["ocultar"]) in ("SI", "S", "X", "1", "OCULTAR")
+        # departamento: TODO (se ve completo) o SOLO LISTA (solo sus provincias/distritos de la lista)
+        f["mostrar"] = "SOLO LISTA" if "SOLO" in norm(f["mostrar"]) else "TODO"
     return filas
 
 
@@ -253,7 +256,7 @@ def lista_xlsx():
     extras = list(dict.fromkeys(c for d in datos.values() for c in d if c not in COLUMNAS and c != "nivel"))
     ws.append(["nombre", "nivel", "departamento", "provincia"] + COLUMNAS + extras)
     for f in filas:
-        if not f["en_area"]:
+        if not f["en_area"] or f["ocultar"]:
             continue
         d = datos.get(f["id"] or "", {})
         ws.append([f["nombre"], f["nivel"], f["departamento"], f["provincia"]] +
@@ -341,8 +344,9 @@ class H(BaseHTTPRequestHandler):
             if p.rstrip("/") in ("/trabajo", "/trabajo.html"):
                 return self.send(200, (ROOT / "trabajo.html").read_bytes(), "text/html; charset=utf-8")
             if p in ESTATICOS:
-                return self.send(200, (ROOT / p[1:]).read_bytes(), ESTATICOS[p],
-                                 {"Cache-Control": "public, max-age=86400"})
+                # MapLibre no cambia: se guarda un día. filtro.js / tooltip.js sí cambian: siempre frescos
+                cache = "public, max-age=86400" if p.startswith("/vendor/") else "no-cache"
+                return self.send(200, (ROOT / p[1:]).read_bytes(), ESTATICOS[p], {"Cache-Control": cache})
             if p in ("/", "/index.html"):
                 return self.send(200, (ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
             self.send(404, b"not found", "text/plain")

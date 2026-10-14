@@ -36,6 +36,7 @@
     .etq { pointer-events: none !important; white-space: nowrap; font: 600 11px system-ui, sans-serif; color: #1f2937;
       text-transform: uppercase; letter-spacing: .03em;
       text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff; }
+    .etq.dep { font-size: 13px; font-weight: 800; color: #374151; }
     .etq.prov { font-size: 12px; }
     .etq.dest { color: #0b63ce; font-size: 13px; font-weight: 800; }`;
   document.head.appendChild(css);
@@ -58,20 +59,25 @@
       const ext = await extensiones();
       if (mio !== turno) return; // llegó otro pedido mientras tanto
       marcas.forEach(m => m.marker.remove());
-      marcas = ids.filter(g => ext[g]?.length >= 6).map(g => {
+      marcas = ids.filter(g => ext[g]).map(g => {
+        const e = ext[g];
+        // centro del polígono; si el servidor aún no lo calculó, el centro de la caja
+        const punto = e.length >= 6 ? [e[4], e[5]] : [(e[0] + e[2]) / 2, (e[1] + e[3]) / 2];
         const el = document.createElement('div');
-        el.className = 'etq ' + (g[0] === '8' ? 'prov' : 'dist') + (g === destacado ? ' dest' : '');
+        el.className = 'etq ' + ({ 7: 'dep', 8: 'prov', 9: 'dist' }[g[0]]) + (g === destacado ? ' dest' : '');
         el.textContent = nombreDe(g);
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([ext[g][4], ext[g][5]]).addTo(map);
-        return { el, marker, prioridad: g === destacado ? Infinity : ext[g][6] || 0 };
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(punto).addTo(map);
+        return { el, marker, prioridad: g === destacado ? Infinity : e[6] ?? (e[2] - e[0]) * (e[3] - e[1]) };
       }).sort((a, b) => b.prioridad - a.prioridad);
       requestAnimationFrame(acomodar);
     };
   }
 
-  // opciones: { map, contenedor, datos, area (Set de ids de departamento o null), permitido(gid), alElegir(gid|null),
-  //             etiquetasIniciales: true para mostrar las provincias del área sin elegir nada }
-  function crear({ map, contenedor, datos, area = null, permitido = () => true, alElegir, etiquetasIniciales = false }) {
+  // opciones: { map, contenedor, datos, area (Set de ids de departamento o null), permitido(gid): qué sale en los combos,
+  //             rotulable(gid): qué zonas pueden llevar nombre, etiquetasIniciales(): ids con nombre sin elegir nada,
+  //             alElegir(gid|null) }
+  function crear({ map, contenedor, datos, area = null, permitido = () => true, rotulable = () => true,
+                   etiquetasIniciales = null, alElegir }) {
     const ids = Object.keys(datos);
     const orden = (a, b) => nombre(datos, a).localeCompare(nombre(datos, b), 'es');
     const deps = ids.filter(g => g[0] === '7' && (!area || area.has(g))).sort(orden);
@@ -87,9 +93,11 @@
                     distDe: p => ids.filter(g => g[0] === '9' && g.slice(1, 5) === p.slice(1, 5)) };
     const ponerEtiquetas = crearEtiquetas(map);
     const etiquetar = () => {
-      const lista = sProv.value ? todas.distDe(sProv.value)
-                  : sDep.value ? todas.provDe(sDep.value)
-                  : etiquetasIniciales ? deps.flatMap(todas.provDe) : [];
+      const lista = sProv.value ? todas.distDe(sProv.value).filter(rotulable)
+                  : sDep.value ? todas.provDe(sDep.value).filter(rotulable).concat(  // + distritos sueltos visibles
+                      ids.filter(g => g[0] === '9' && g.slice(1, 3) === sDep.value.slice(1, 3) && rotulable(g) &&
+                                      !rotulable('8' + g.slice(1, 5) + '00')))
+                  : etiquetasIniciales ? etiquetasIniciales() : deps;
       ponerEtiquetas(lista, g => nombre(datos, g), sDist.value || null);
     };
 
