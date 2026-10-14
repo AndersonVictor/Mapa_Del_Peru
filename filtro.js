@@ -30,8 +30,48 @@
         ? ['==', ['to-number', ['get', 'id_geografia']], +gid] : NADA);
   }
 
-  // opciones: { map, contenedor, datos, area (Set de ids de departamento o null), permitido(gid), alElegir(gid|null) }
-  function crear({ map, contenedor, datos, area = null, permitido = () => true, alElegir }) {
+  // --- Nombres sobre el mapa (etiquetas HTML: no necesitan fuentes descargadas) ---
+  const css = document.createElement('style');
+  css.textContent = `
+    .etq { pointer-events: none !important; white-space: nowrap; font: 600 11px system-ui, sans-serif; color: #1f2937;
+      text-transform: uppercase; letter-spacing: .03em;
+      text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff; }
+    .etq.prov { font-size: 12px; }
+    .etq.dest { color: #0b63ce; font-size: 13px; font-weight: 800; }`;
+  document.head.appendChild(css);
+
+  function crearEtiquetas(map) {
+    let marcas = [], turno = 0;
+    // Oculta las que se tapan entre sí: primero la elegida, luego las zonas más grandes
+    const acomodar = () => {
+      const puestos = [];
+      for (const m of marcas) {
+        m.el.style.visibility = 'visible';
+        const r = m.el.getBoundingClientRect();
+        const choca = puestos.some(p => r.left < p.right + 4 && r.right > p.left - 4 && r.top < p.bottom + 2 && r.bottom > p.top - 2);
+        if (choca) m.el.style.visibility = 'hidden'; else puestos.push(r);
+      }
+    };
+    map.on('moveend', acomodar);
+    return async (ids, nombreDe, destacado) => {
+      const mio = ++turno;
+      const ext = await extensiones();
+      if (mio !== turno) return; // llegó otro pedido mientras tanto
+      marcas.forEach(m => m.marker.remove());
+      marcas = ids.filter(g => ext[g]?.length >= 6).map(g => {
+        const el = document.createElement('div');
+        el.className = 'etq ' + (g[0] === '8' ? 'prov' : 'dist') + (g === destacado ? ' dest' : '');
+        el.textContent = nombreDe(g);
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([ext[g][4], ext[g][5]]).addTo(map);
+        return { el, marker, prioridad: g === destacado ? Infinity : ext[g][6] || 0 };
+      }).sort((a, b) => b.prioridad - a.prioridad);
+      requestAnimationFrame(acomodar);
+    };
+  }
+
+  // opciones: { map, contenedor, datos, area (Set de ids de departamento o null), permitido(gid), alElegir(gid|null),
+  //             etiquetasIniciales: true para mostrar las provincias del área sin elegir nada }
+  function crear({ map, contenedor, datos, area = null, permitido = () => true, alElegir, etiquetasIniciales = false }) {
     const ids = Object.keys(datos);
     const orden = (a, b) => nombre(datos, a).localeCompare(nombre(datos, b), 'es');
     const deps = ids.filter(g => g[0] === '7' && (!area || area.has(g))).sort(orden);
@@ -40,6 +80,18 @@
     const distDe = p => ids.filter(g => g[0] === '9' && permitido(g) &&
       (g.slice(1, 5) === p.slice(1, 5) ||
        (N(datos[g].nombprov) === N(datos[p].nombprov) && N(datos[g].nombregion) === N(datos[p].nombregion)))).sort(orden);
+
+    // Nombres en el mapa: departamento elegido -> sus provincias; provincia elegida -> sus distritos.
+    // Se muestran todas (no solo las de la lista) para ubicarse mejor.
+    const todas = { provDe: r => ids.filter(g => g[0] === '8' && g.slice(1, 3) === r.slice(1, 3)),
+                    distDe: p => ids.filter(g => g[0] === '9' && g.slice(1, 5) === p.slice(1, 5)) };
+    const ponerEtiquetas = crearEtiquetas(map);
+    const etiquetar = () => {
+      const lista = sProv.value ? todas.distDe(sProv.value)
+                  : sDep.value ? todas.provDe(sDep.value)
+                  : etiquetasIniciales ? deps.flatMap(todas.provDe) : [];
+      ponerEtiquetas(lista, g => nombre(datos, g), sDist.value || null);
+    };
 
     contenedor.innerHTML = '';
     const combo = (texto) => {
@@ -58,14 +110,16 @@
     const elegir = () => {
       const gid = sDist.value || sProv.value || sDep.value || null;
       marcar(map, gid);
+      etiquetar();
       alElegir?.(gid);
     };
     sDep.onchange = () => { sProv.llenar(sDep.value ? provDe(sDep.value) : []); sDist.llenar([]); elegir(); };
     sProv.onchange = () => { sDist.llenar(sProv.value ? distDe(sProv.value) : []); elegir(); };
     sDist.onchange = elegir;
 
+    etiquetar();
     return {
-      reiniciar() { sDep.value = ''; sProv.llenar([]); sDist.llenar([]); marcar(map, null); },
+      reiniciar() { sDep.value = ''; sProv.llenar([]); sDist.llenar([]); marcar(map, null); etiquetar(); },
       // Pone los combos en una zona (p. ej. al hacer clic en la lista del mapa de trabajo)
       ir(gid) {
         const dep = gid[0] === '7' ? gid : deps.find(r => (gid[0] === '8' ? provDe(r) : provDe(r).flatMap(distDe)).includes(gid));

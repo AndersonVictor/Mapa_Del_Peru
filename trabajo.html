@@ -178,7 +178,7 @@ map.on('load', async () => {
   const permitido = g => g[0] === '8'
     ? provIds.has(g) || [...distIds].some(x => x.slice(1, 5) === g.slice(1, 5))
     : distIds.has(g) || provIds.has('8' + g.slice(1, 5) + '00');
-  filtro = Filtro.crear({ map, contenedor: document.getElementById('combos'), datos, area: regIds, permitido,
+  filtro = Filtro.crear({ map, contenedor: document.getElementById('combos'), datos, area: regIds, permitido, etiquetasIniciales: true,
     alElegir: gid => { marcarLista(gid); gid ? Filtro.acercar(map, gid) : verTodo(); } });
 
   // Encuadre exacto de los departamentos y no dejar irse lejos
