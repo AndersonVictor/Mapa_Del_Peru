@@ -24,6 +24,10 @@
   .logo .ic { width: 24px; height: 24px; }
   .cab h1 { font-size: 18px; margin: 0; font-weight: 800; letter-spacing: -.01em; }
   .cab small { color: #f3d9dd; font-size: 12.5px; }
+  /* imagen del título (src/img/titulo.png): centrada en el encabezado */
+  .cab { position: relative; }
+  .titulo-img { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-height: 54px; max-width: calc(100% - 860px);
+    object-fit: contain; pointer-events: none; }
   .cab .ir { margin-left: auto; color: #fff; text-decoration: none; font-size: 12.5px; font-weight: 600; display: inline-flex;
     align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; background: rgba(255,255,255,.1); }
   .cab .ir:hover { background: rgba(255,255,255,.18); }
@@ -159,9 +163,16 @@
     .s3, .s4, .s5 { grid-column: span 6; } .s7, .s8 { grid-column: span 12; }
     #pob-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
+  @media (max-width: 1200px) {
+    .cab { flex-wrap: wrap; }
+    .titulo-img { position: static; transform: none; order: 3; flex-basis: 100%; max-width: 100%; max-height: 44px; }
+    .cab .ir { order: 2; }
+  }
   @media (max-width: 700px) {
-    .cab { padding: 12px 16px; gap: 10px 12px; flex-wrap: nowrap; }
+    .cab { padding: 12px 16px; gap: 10px 12px; flex-wrap: wrap; }
+    .titulo-img { position: static; transform: none; order: 3; flex-basis: 100%; max-width: 100%; max-height: 40px; }
     .cab > div:nth-child(2) { flex: 1; min-width: 0; }
+    .cab .ir { order: 2; }
     .cab h1 { font-size: 15px; } .cab small { font-size: 11.5px; }
     .logo { width: 36px; height: 36px; border-radius: 10px; }
     .cab .ir { margin-left: 0; padding: 8px; } .cab .ir .txt { display: none; }
@@ -189,6 +200,7 @@
 <header class="cab">
   <div class="logo"><svg class="ic"><use href="/iconos.svg#escala"/></svg></div>
   <div><h1>Corte Superior de Justicia de Junín</h1><small>Dashboard territorial · Junín y Huancavelica</small></div>
+  <img class="titulo-img" src="/src/img/titulo.png" alt="" onerror="this.remove()">
   <a class="ir" href="/" title="Mapa general del Perú"><svg class="ic"><use href="/iconos.svg#mapa"/></svg><span class="txt">Mapa general del Perú</span></a>
 </header>
 <nav class="tabs">
