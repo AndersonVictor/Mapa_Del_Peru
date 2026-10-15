@@ -39,8 +39,8 @@
     textStyle: { fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', color: SUAVE },
     animationDuration: 500,
   };
-  const TIP = { confine: true, backgroundColor: 'rgba(17,24,39,.94)', borderColor: 'rgba(245,158,11,.45)', borderWidth: 1,
-    padding: [8, 12], textStyle: { color: '#fff', fontSize: 12 }, extraCssText: 'border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);' };
+  const TIP = { confine: true, backgroundColor: 'rgba(58,15,24,.96)', borderColor: 'rgba(245,158,11,.45)', borderWidth: 1,
+    padding: [8, 12], textStyle: { color: '#fff', fontSize: 13 }, extraCssText: 'border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);' };
   function grafico(id, opcion, alClic) {
     const el = $(id);
     if (!el) return null;
@@ -75,11 +75,11 @@
     c.setOption(op, true);
     return c;
   }
-  const leyenda = (extra) => Object.assign({ top: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 14, textStyle: { fontSize: 11.5, color: SUAVE } }, extra);
+  const leyenda = (extra) => Object.assign({ top: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 14, textStyle: { fontSize: 12.5, color: SUAVE } }, extra);
   const rejilla = (extra) => Object.assign({ left: 8, right: 14, top: 32, bottom: 6, containLabel: true }, extra);
-  const ejeNum = (extra) => Object.assign({ type: 'value', axisLabel: { fontSize: 10.5, color: '#9ca3af', formatter: corto },
+  const ejeNum = (extra) => Object.assign({ type: 'value', axisLabel: { fontSize: 11.5, color: '#9ca3af', formatter: corto },
     splitLine: { lineStyle: { color: REJILLA } }, axisLine: { show: false } }, extra);
-  const ejeCat = (datos, extra) => Object.assign({ type: 'category', data: datos, axisLabel: { fontSize: 11, color: SUAVE },
+  const ejeCat = (datos, extra) => Object.assign({ type: 'category', data: datos, axisLabel: { fontSize: 12, color: SUAVE },
     axisTick: { show: false }, axisLine: { lineStyle: { color: '#e5e7eb' } } }, extra);
   // Dona al estilo INEI: anillo grueso, separaciones, sin textos encima (la leyenda va debajo, en HTML)
   const dona = (datos, extra) => Object.assign({
@@ -162,7 +162,7 @@
       tooltip: { trigger: 'axis', valueFormatter: fmt }, grid: rejilla({ top: 8, right: 60 }),
       xAxis: ejeNum(), yAxis: ejeCat(asc),
       series: [{ type: 'bar', barWidth: '62%', data: asc.map((p, i) => ({ value: pobDe(p, anio), itemStyle: { color: PALETA[(provs.length - 1 - i) % PALETA.length] } })),
-        label: { show: true, position: 'right', formatter: p => fmt(p.value), fontSize: 10 } }],
+        label: { show: true, position: 'right', formatter: p => fmt(p.value), fontSize: 11 } }],
     });
     // Jueces por cada 100 mil habitantes
     const M = T.Magistrados || [];
@@ -180,7 +180,7 @@
         return `<b>${esc(f.nombre)}</b><br>${fmt(f.valor)} jueces por 100 mil hab.<br>${fmt(f.j)} jueces · ${fmt(f.pob)} hab.`; } },
       grid: rejilla({ top: 8, right: 40 }), xAxis: ejeNum(), yAxis: ejeCat(filas.map(f => f.nombre)),
       series: [{ type: 'bar', barWidth: '62%', data: filas.map(f => ({ value: +f.valor.toFixed(1), itemStyle: { color: f.ref ? COLOR.granate : '#1e88e5' } })),
-        label: { show: true, position: 'right', fontSize: 10, formatter: p => fmt(p.value) } }],
+        label: { show: true, position: 'right', fontSize: 11, formatter: p => fmt(p.value) } }],
     });
     // Mini gráficos: varones y mujeres por provincia
     const cont = $('pob-mini');
@@ -192,7 +192,7 @@
       const filasP = anios.map(a => P.find(r => r.PROVINCIA === p && r['AÑO'] === a) || {});
       grafico('c-mini-' + i, {
         tooltip: { trigger: 'axis', valueFormatter: fmt }, grid: { left: 4, right: 10, top: 8, bottom: 4, containLabel: true },
-        xAxis: ejeCat(anios, { axisLabel: { fontSize: 9 } }), yAxis: ejeNum({ scale: true, axisLabel: { fontSize: 9, formatter: v => fmt(v / 1000) + ' mil' } }),
+        xAxis: ejeCat(anios, { axisLabel: { fontSize: 10 } }), yAxis: ejeNum({ scale: true, axisLabel: { fontSize: 10, formatter: v => fmt(v / 1000) + ' mil' } }),
         series: [
           { name: 'Mujeres', type: 'line', data: filasP.map(r => num(r.MUJERES)), color: COLOR.mujer, symbolSize: 5 },
           { name: 'Varones', type: 'line', data: filasP.map(r => num(r.VARONES)), color: COLOR.varon, symbolSize: 5 },
@@ -209,10 +209,10 @@
 
     grafico('c-prov-sexo', {
       tooltip: { trigger: 'axis' }, legend: leyenda({ right: 0 }), grid: rejilla(),
-      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
+      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 11, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
       series: [
-        { name: 'Varones', type: 'bar', color: COLOR.varon, data: ps.map(p => barra(p.filas.filter(esVaron).length, p, COLOR.varon)), label: { show: true, position: 'top', fontSize: 10.5, fontWeight: 700, color: TEXTO } },
-        { name: 'Mujeres', type: 'bar', color: COLOR.mujer, data: ps.map(p => barra(p.filas.filter(esMujer).length, p, COLOR.mujer)), label: { show: true, position: 'top', fontSize: 10.5, fontWeight: 700, color: TEXTO } },
+        { name: 'Varones', type: 'bar', color: COLOR.varon, data: ps.map(p => barra(p.filas.filter(esVaron).length, p, COLOR.varon)), label: { show: true, position: 'top', fontSize: 11.5, fontWeight: 700, color: TEXTO } },
+        { name: 'Mujeres', type: 'bar', color: COLOR.mujer, data: ps.map(p => barra(p.filas.filter(esMujer).length, p, COLOR.mujer)), label: { show: true, position: 'top', fontSize: 11.5, fontWeight: 700, color: TEXTO } },
       ],
     }, clicProv);
 
@@ -231,19 +231,19 @@
       tooltip: { trigger: 'item', formatter: p => { const f = porInst[p.dataIndex];
         return `<b>${nomInst[INST[p.dataIndex]].replace('\n', ' ')}</b><br>${f.length} en total<br>` +
                `<span style="color:#6fa8d4">Varones</span> ${f.filter(esVaron).length} · <span style="color:#f472b6">Mujeres</span> ${f.filter(esMujer).length}`; } },
-      grid: rejilla({ top: 46, bottom: 4 }), xAxis: ejeCat(INST.map(i => nomInst[i]), { axisLabel: { fontSize: 10.5, color: SUAVE, lineHeight: 13, interval: 0 } }),
+      grid: rejilla({ top: 46, bottom: 4 }), xAxis: ejeCat(INST.map(i => nomInst[i]), { axisLabel: { fontSize: 11.5, color: SUAVE, lineHeight: 13, interval: 0 } }),
       yAxis: ejeNum({ show: false }),
       series: [{ type: 'bar', barMaxWidth: 46, data: porInst.map((f, k) => ({ value: f.length, itemStyle: { color: colInst[INST[k]] } })),
         label: { show: true, position: 'top', formatter: p => `{v|${fmt(p.value)}}\n{p|${m.length ? fmt(p.value / m.length * 100) : 0}%}`,
-          rich: { v: { fontSize: 15, fontWeight: 800, color: TEXTO, lineHeight: 18 }, p: { fontSize: 11.5, fontWeight: 600, color: '#9ca3af' } } } }],
+          rich: { v: { fontSize: 16, fontWeight: 800, color: TEXTO, lineHeight: 18 }, p: { fontSize: 12.5, fontWeight: 600, color: '#9ca3af' } } } }],
     });
 
     grafico('c-inst-prov', {
       tooltip: { trigger: 'axis' }, legend: leyenda(), grid: rejilla(),
-      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
+      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 11, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
       series: ['SALA', 'J. ESP.', 'JPL'].map(i => ({ name: i, type: 'bar', stack: 'inst', color: colInst[i],
         data: ps.map(p => barra(p.filas.filter(r => inst(r) === i).length || null, p, colInst[i])),
-        label: { show: true, fontSize: 10, fontWeight: 700, color: '#fff', formatter: e => e.value > 1 ? e.value : '' } })),
+        label: { show: true, fontSize: 11, fontWeight: 700, color: '#fff', formatter: e => e.value > 1 ? e.value : '' } })),
     }, clicProv);
 
     const conds = [['T', 'Titulares', COLOR.titular, 'titular'], ['S', 'Supernumerarios', COLOR.supern, 'supernumerario'], ['P', 'Provisionales', COLOR.provis, 'provisional']];
@@ -252,10 +252,10 @@
     leyendaDona('c-cond', porCond);
     grafico('c-cond-prov', {
       tooltip: { trigger: 'axis' }, legend: leyenda(), grid: rejilla(),
-      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
+      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 11, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
       series: conds.map(([k, n, c]) => ({ name: n, type: 'bar', stack: 'cond', color: c,
         data: ps.map(p => barra(p.filas.filter(r => cond(r) === k).length || null, p, c)),
-        label: { show: true, fontSize: 10, fontWeight: 700, color: '#fff', formatter: e => e.value > 1 ? e.value : '' } })),
+        label: { show: true, fontSize: 11, fontWeight: 700, color: '#fff', formatter: e => e.value > 1 ? e.value : '' } })),
     }, clicProv);
 
     tablaMagistrados(m);
@@ -304,7 +304,7 @@
     });
     grafico('c-cp-100', {
       color: PALETA, tooltip: { trigger: 'axis', valueFormatter: v => fmt(v) + '%' }, legend: leyenda(), grid: rejilla({ top: 58 }),
-      xAxis: ejeCat(anios), yAxis: ejeNum({ max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } }),
+      xAxis: ejeCat(anios), yAxis: ejeNum({ max: 100, axisLabel: { formatter: '{value}%', fontSize: 11 } }),
       series: esps.map(e => ({ name: e, type: 'bar', stack: 'p', barWidth: '70%',
         data: anios.map(a => { const t = suma(a, 'CARGA_PROCESAL'); return t ? +(suma(a, 'CARGA_PROCESAL', e) / t * 100).toFixed(1) : 0; }) })),
     });
@@ -315,7 +315,7 @@
     });
     grafico('c-cp-tasa', {
       color: PALETA, tooltip: { trigger: 'axis', valueFormatter: v => v == null ? '–' : fmt(v) + '%' }, legend: leyenda(), grid: rejilla({ top: 58 }),
-      xAxis: ejeCat(anios), yAxis: ejeNum({ axisLabel: { formatter: '{value}%', fontSize: 10 } }),
+      xAxis: ejeCat(anios), yAxis: ejeNum({ axisLabel: { formatter: '{value}%', fontSize: 11 } }),
       series: esps.map(e => Object.assign({ name: e, connectNulls: false,
         data: anios.map(a => { const i = suma(a, 'INGRESOS', e); return i ? +(suma(a, 'RESUELTOS', e) / i * 100).toFixed(1) : null; }) }, lin)),
     });
@@ -327,10 +327,10 @@
     grafico('c-sobrecarga', {
       tooltip: { trigger: 'item', formatter: p => { const r = S[p.dataIndex];
         return `<b>${esc(r.nombre)}</b><br>Carga máxima: ${fmt(r.max)}<br>Carga proyectada: ${fmt(r.proy)}<br>Sobrecarga: <b>${fmt(r.pct)}%</b>`; } },
-      grid: rejilla({ top: 8, right: 50 }), xAxis: ejeNum({ axisLabel: { formatter: '{value}%', fontSize: 10 } }),
-      yAxis: ejeCat(S.map(r => corto(r.nombre)), { axisLabel: { fontSize: 9, width: 260, overflow: 'truncate' } }),
+      grid: rejilla({ top: 8, right: 50 }), xAxis: ejeNum({ axisLabel: { formatter: '{value}%', fontSize: 11 } }),
+      yAxis: ejeCat(S.map(r => corto(r.nombre)), { axisLabel: { fontSize: 10, width: 260, overflow: 'truncate' } }),
       series: [{ type: 'bar', barWidth: '64%', data: S.map(r => ({ value: +r.pct.toFixed(1), itemStyle: { color: r.pct >= 100 ? '#c62828' : r.pct >= 50 ? '#ef6c00' : '#fbc02d' } })),
-        label: { show: true, position: 'right', fontSize: 10, formatter: p => fmt(p.value) + '%' } }],
+        label: { show: true, position: 'right', fontSize: 11, formatter: p => fmt(p.value) + '%' } }],
     });
   }
 
@@ -365,12 +365,12 @@
       });
       grafico(`c-${pre}-tasa`, {
         color: PALETA, tooltip: { trigger: 'axis', valueFormatter: v => v == null ? '–' : fmt(v) + '%' }, legend: leyenda(), grid: rejilla({ top: 58 }),
-        xAxis: ejeCat(ys.map(etiqueta)), yAxis: ejeNum({ scale: true, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } }),
+        xAxis: ejeCat(ys.map(etiqueta)), yAxis: ejeNum({ scale: true, max: 100, axisLabel: { formatter: '{value}%', fontSize: 11 } }),
         series: ks.map(k => Object.assign({ name: k, data: ys.map(a => { const p = s(k, a, 'PROGRAMADAS'); return hay(k, a) && p ? +(s(k, a, campoAt) / p * 100).toFixed(1) : null; }) }, lin)),
       });
       grafico(`c-${pre}-acum`, {
         tooltip: { trigger: 'axis', valueFormatter: fmt }, legend: leyenda(), grid: rejilla(),
-        xAxis: ejeCat(ks, { axisLabel: { fontSize: 10, interval: 0, rotate: ks.length > 7 ? 30 : 0 } }), yAxis: ejeNum(),
+        xAxis: ejeCat(ks, { axisLabel: { fontSize: 11, interval: 0, rotate: ks.length > 7 ? 30 : 0 } }), yAxis: ejeNum(),
         series: [['Programadas', 'PROGRAMADAS', COLOR.programadas], [nombreAt, campoAt, COLOR.atendidas], ['Suspendidas', 'SUSPENDIDAS', COLOR.suspendidas]]
           .map(([n, c, col]) => ({ name: n, type: 'bar', color: col, data: ks.map(k => s(k, null, c)) })),
       });
@@ -378,9 +378,9 @@
         .sort((a, b) => a.v - b.v);
       grafico(`c-${pre}-anio`, {
         tooltip: { trigger: 'axis', valueFormatter: v => fmt(v) + '%' }, grid: rejilla({ top: 8, right: 50 }),
-        xAxis: ejeNum({ scale: true, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } }), yAxis: ejeCat(filas.map(f => f.k)),
+        xAxis: ejeNum({ scale: true, max: 100, axisLabel: { formatter: '{value}%', fontSize: 11 } }), yAxis: ejeCat(filas.map(f => f.k)),
         series: [{ type: 'bar', barWidth: '62%', data: filas.map((f, i) => ({ value: +f.v.toFixed(1), itemStyle: { color: PALETA[i % PALETA.length] } })),
-          label: { show: true, position: 'right', fontSize: 10, formatter: p => fmt(p.value) + '%' } }],
+          label: { show: true, position: 'right', fontSize: 11, formatter: p => fmt(p.value) + '%' } }],
       });
       const t = $(`t-${pre}-anio`);
       if (t) t.textContent = anio + (parcial.has(anio) ? ' (parcial)' : '');
@@ -411,7 +411,7 @@
       .sort((a, b) => b.t - a.t).slice(0, 15).reverse();
     grafico('c-pe-cargos', {
       tooltip: { trigger: 'axis', valueFormatter: fmt }, legend: leyenda(), grid: rejilla({ right: 30 }),
-      xAxis: ejeNum(), yAxis: ejeCat(top.map(x => x.cargo), { axisLabel: { fontSize: 9, width: 220, overflow: 'truncate' } }),
+      xAxis: ejeNum(), yAxis: ejeCat(top.map(x => x.cargo), { axisLabel: { fontSize: 10, width: 220, overflow: 'truncate' } }),
       series: REGIMENES.map(g => ({ name: g.n, type: 'bar', stack: 'c', color: g.c, data: top.map(x => deReg(x.r, g) || null) })),
     });
     const cuerpo = $('t-pe'), buscar = $('t-pe-buscar');

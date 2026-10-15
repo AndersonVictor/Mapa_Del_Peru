@@ -34,7 +34,7 @@
   // --- Nombres sobre el mapa (etiquetas HTML: no necesitan fuentes descargadas) ---
   const css = document.createElement('style');
   css.textContent = `
-    .etq { pointer-events: none !important; white-space: nowrap; font: 600 11px system-ui, sans-serif; color: #1f2937;
+    .etq { pointer-events: none !important; white-space: nowrap; font: 600 12px system-ui, sans-serif; color: #1f2937;
       text-transform: uppercase; letter-spacing: .03em;
       text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff; }
     .etq.dep { font-size: 13px; font-weight: 800; color: #374151; }
@@ -43,10 +43,10 @@
     /* combos (estilo INEI): botón + lista desplegable con círculos de selección.
        COLOR_COMBO es el color de lo elegido: cámbialo aquí. */
     .combo { --c: ${COLOR_COMBO}; position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-    .combo > span { font: 600 10.5px system-ui, sans-serif; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+    .combo > span { font: 600 11.5px system-ui, sans-serif; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
     .combo select { display: none; }
     .combo-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;
-      font: 700 12.5px system-ui, sans-serif; padding: 9px 12px; border: 1px solid #d9dde5; border-radius: 10px;
+      font: 700 13.5px system-ui, sans-serif; padding: 9px 12px; border: 1px solid #d9dde5; border-radius: 10px;
       background: #fff; color: #1f2937; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
     .combo-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .combo-btn svg { width: 14px; height: 14px; flex: none; transition: transform .15s; }
@@ -58,11 +58,11 @@
       background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 32px rgba(16,24,40,.16);
       overflow: hidden; display: none; }
     .combo.abierto .combo-menu { display: block; }
-    .combo-menu .tit { font: 700 10.5px system-ui, sans-serif; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em;
+    .combo-menu .tit { font: 700 11.5px system-ui, sans-serif; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em;
       padding: 10px 12px 6px; border-bottom: 1px solid #f1f2f5; }
     .combo-menu .ops { max-height: 290px; overflow-y: auto; padding: 4px 0; }
     .combo-op { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 0; background: none;
-      font: 600 12.5px system-ui, sans-serif; color: #1f2937; text-align: left; cursor: pointer; transition: background-color .12s; }
+      font: 600 13.5px system-ui, sans-serif; color: #1f2937; text-align: left; cursor: pointer; transition: background-color .12s; }
     .combo-op:hover, .combo-op:focus-visible { background: #f3f6fa; outline: none; }
     .combo-op .radio { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--c); flex: none;
       display: flex; align-items: center; justify-content: center; }
