@@ -5,7 +5,7 @@ Antes, una sola vez, descarga todo con:  python descargar_todo.py
 Las funciones de descarga (token, fetch_tile, fetch_tooltip) solo las usan los scripts
 descargar_todo.py y actualizar_excel.py.
 """
-import io, json, math, re, threading, time, unicodedata, urllib.request, urllib.error
+import io, json, math, re, threading, time, unicodedata, urllib.parse, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
@@ -292,6 +292,10 @@ def jueces_json():
         return _jueces["json"]
 
 
+TIPOS_SRC = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml",
+             ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon", ".css": "text/css",
+             ".js": "application/javascript"}
+
 ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
              "/vendor/maplibre-gl.css": "text/css",
              "/vendor/echarts.min.js": "application/javascript",
@@ -359,12 +363,24 @@ class H(BaseHTTPRequestHandler):
                 # MapLibre no cambia: se guarda un día. filtro.js / tooltip.js sí cambian: siempre frescos
                 cache = "public, max-age=86400" if ruta.startswith("/vendor/") else "no-cache"
                 return self.send(200, (ROOT / ruta[1:]).read_bytes(), ESTATICOS[ruta], {"Cache-Control": cache})
+            if ruta.startswith("/src/"):
+                return self.archivo_src(ruta)
             if p in ("/", "/index.html"):
                 return self.send(200, pagina("index.html"), "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
             self.send(404, b"not found", "text/plain")
         except Exception as e:
             print(f"Error en {p}: {e!r}")
             self.send(500, str(e).encode(), "text/plain")
+
+    def archivo_src(self, ruta):
+        """Imágenes y archivos propios en la carpeta src/ (ej. /src/img/titulo.png).
+        Siempre se revalidan: si reemplazas la imagen, se ve la nueva al recargar."""
+        base = (ROOT / "src").resolve()
+        f = (ROOT / urllib.parse.unquote(ruta).lstrip("/")).resolve()
+        tipo = TIPOS_SRC.get(f.suffix.lower())
+        if base not in f.parents or not tipo or not f.is_file():
+            return self.send(404, b"not found", "text/plain")
+        return self.send(200, f.read_bytes(), tipo, {"Cache-Control": "no-cache"})
 
     def log_message(self, *a):
         pass
