@@ -1,7 +1,7 @@
 """Datos del dashboard de la CSJ Junín, desde dashboard.xlsx (tablas planas, una fila por registro).
 
 - Magistrados -> un juez o jueza por fila: tarjetas, gráficos del resumen y burbujas por sede.
-- Organos     -> coordenadas de cada órgano: ubican la burbuja de cada sede en el mapa.
+- Organos     -> un órgano jurisdiccional por fila (tarjeta de órganos).
 - El resto de hojas (Poblacion, Carga_Procesal, Audiencias_*, Personal...) se envían tal cual y
   el navegador hace las sumas, así los totales salen siempre de la misma fuente.
 
@@ -105,29 +105,17 @@ def resumen(ruta, datos, cajas):
     for m in tablas.get("Magistrados", []):
         sumar(csjj, m)
 
-    # Burbujas: mediana de las coordenadas de sus órganos que caen dentro del distrito
-    coords, malas = defaultdict(list), defaultdict(int)
+    # Órganos: provincia y distrito en el mapa (para filtrar la tarjeta de órganos)
     for o in tablas.get("Organos", []):
-        did = buscar("9", o.get("DISTRITO"), o.get("DEPARTAMENTO"), o.get("PROVINCIA"))
-        o["prov_id"], o["dist_id"] = buscar("8", o.get("PROVINCIA"), o.get("DEPARTAMENTO")), did
-        lat, lon = o.get("LATITUD"), o.get("LONGITUD")
-        if not did or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
-            continue
-        c = cajas.get(did)
-        if c and c[0] - 0.01 <= lon <= c[2] + 0.01 and c[1] - 0.01 <= lat <= c[3] + 0.01:
-            coords[did].append((lon, lat))
-        else:
-            malas[f"{o.get('DISTRITO')} ({o.get('PROVINCIA')})"] += 1
+        o["prov_id"] = buscar("8", o.get("PROVINCIA"), o.get("DEPARTAMENTO"))
+        o["dist_id"] = buscar("9", o.get("DISTRITO"), o.get("DEPARTAMENTO"), o.get("PROVINCIA"))
+
+    # Burbujas: en el centro de su distrito (el mapa ya sabe dónde está cada distrito)
     for did, s in sedes.items():
-        pts, c = coords.get(did), cajas.get(did)
-        if pts:
-            s["lon"] = sorted(p[0] for p in pts)[len(pts) // 2]
-            s["lat"] = sorted(p[1] for p in pts)[len(pts) // 2]
-        elif c:
+        c = cajas.get(did)
+        if c:
             s["lon"], s["lat"] = (c[4], c[5]) if len(c) >= 6 else ((c[0] + c[2]) / 2, (c[1] + c[3]) / 2)
 
-    for k, n in malas.items():
-        avisos.append(f"Organos: {n} coordenada(s) de {k} caen fuera de su distrito (se ignoraron).")
     for k, n in sin_ubicar.items():
         avisos.append(f"Magistrados: sede '{k}' no coincide con un distrito de datos.xlsx ({n} juez/jueza sin burbuja).")
 
