@@ -5,7 +5,7 @@
 // =====================================================================================
 (function () {
   const COLOR = {
-    varon: '#0056a1', mujer: '#33b3a9',
+    varon: '#0056a1', mujer: '#e8559a',
     titular: '#16a34a', supern: '#f59e0b', provis: '#8b5cf6',
     sala: '#1e3a8a', jesp: '#0a84d0', jpl: '#8a80f5',
     carga: '#f59e0b', ingresos: '#0a84d0', resueltos: '#16a34a',
@@ -215,7 +215,7 @@
     grafico('c-inst', {
       tooltip: { trigger: 'item', formatter: p => { const f = porInst[p.dataIndex];
         return `<b>${nomInst[INST[p.dataIndex]].replace('\n', ' ')}</b><br>${f.length} en total<br>` +
-               `<span style="color:#6fa8d4">Varones</span> ${f.filter(esVaron).length} · <span style="color:#33b3a9">Mujeres</span> ${f.filter(esMujer).length}`; } },
+               `<span style="color:#6fa8d4">Varones</span> ${f.filter(esVaron).length} · <span style="color:#f472b6">Mujeres</span> ${f.filter(esMujer).length}`; } },
       grid: rejilla({ top: 46, bottom: 4 }), xAxis: ejeCat(INST.map(i => nomInst[i]), { axisLabel: { fontSize: 10.5, color: SUAVE, lineHeight: 13, interval: 0 } }),
       yAxis: ejeNum({ show: false }),
       series: [{ type: 'bar', barMaxWidth: 46, data: porInst.map((f, k) => ({ value: f.length, itemStyle: { color: colInst[INST[k]] } })),

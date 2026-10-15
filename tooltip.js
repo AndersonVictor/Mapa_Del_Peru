@@ -10,7 +10,7 @@ const TOOLTIP_ESTILO = {
   borde: 'rgba(245, 158, 11, .55)', // ámbar
   acento: '#fbbf24',                // dato principal (ámbar)
   hombres: '#6fa8d4',
-  mujeres: '#33b3a9',
+  mujeres: '#f472b6',
   ancho: '250px',                   // ancho mínimo
 };
 
