@@ -52,10 +52,25 @@
     // estilo común: tooltip oscuro y barras con esquinas redondeadas (las apiladas, rectas)
     const op = Object.assign({}, BASE, opcion, { tooltip: Object.assign({}, TIP, opcion.tooltip) });
     const horizontal = !Array.isArray(op.yAxis) && op.yAxis?.type === 'category';
+    const radio = horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0];
+    const pilas = {};
     for (const s of [].concat(op.series || [])) {
       if (s.type !== 'bar') continue;
       s.barMaxWidth = s.barMaxWidth || 34;
-      if (!s.stack) s.itemStyle = Object.assign({ borderRadius: horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0] }, s.itemStyle);
+      if (!s.stack) s.itemStyle = Object.assign({ borderRadius: radio }, s.itemStyle);
+      else { s.labelLayout = { hideOverlap: true }; (pilas[s.stack] = pilas[s.stack] || []).push(s); }
+    }
+    // Barras apiladas: se redondea solo el tramo de arriba de cada columna (se ve como una sola barra)
+    for (const series of Object.values(pilas)) {
+      const largo = Math.max(...series.map(s => (s.data || []).length));
+      for (let i = 0; i < largo; i++) {
+        const tope = series.slice().reverse().find(s => { const d = s.data?.[i]; const v = d && typeof d === 'object' ? d.value : d; return v; });
+        if (!tope) continue;
+        const d = tope.data[i];
+        tope.data[i] = d && typeof d === 'object'
+          ? Object.assign({}, d, { itemStyle: Object.assign({}, d.itemStyle, { borderRadius: radio }) })
+          : { value: d, itemStyle: { borderRadius: radio } };
+      }
     }
     c.setOption(op, true);
     return c;
