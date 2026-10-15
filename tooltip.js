@@ -5,7 +5,7 @@
 
 // 1) COLORES Y TAMAÑOS
 const TOOLTIP_ESTILO = {
-  fondo: 'rgba(17, 24, 39, .96)',   // gris muy oscuro
+  fondo: 'rgba(58, 15, 24, .97)',   // vino oscuro (combina con el granate del encabezado)
   texto: '#ffffff',
   borde: 'rgba(245, 158, 11, .55)', // ámbar
   acento: '#fbbf24',                // dato principal (ámbar)

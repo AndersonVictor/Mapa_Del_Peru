@@ -39,7 +39,7 @@
     textStyle: { fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', color: SUAVE },
     animationDuration: 500,
   };
-  const TIP = { confine: true, backgroundColor: 'rgba(17,24,39,.94)', borderColor: 'rgba(245,158,11,.45)', borderWidth: 1,
+  const TIP = { confine: true, backgroundColor: 'rgba(58,15,24,.96)', borderColor: 'rgba(245,158,11,.45)', borderWidth: 1,
     padding: [8, 12], textStyle: { color: '#fff', fontSize: 12 }, extraCssText: 'border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);' };
   function grafico(id, opcion, alClic) {
     const el = $(id);
