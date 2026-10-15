@@ -62,7 +62,9 @@ Muestra solo las zonas de `lista_trabajo.xlsx` (columnas `NOMBRE`, `NIVEL`, `DEP
 
 `dashboard.xlsx` tiene una hoja por tema, todas planas (una fila por registro, sin títulos ni totales; el dashboard
 suma solo). Su hoja `LEEME` explica cada hoja. Edita, guarda y recarga la página (F5).
-Los colores de los gráficos están al inicio de `graficos.js` (`COLOR`).
+Los colores de los gráficos están al inicio de `graficos.js` (`COLOR`). Los íconos (SVG) están en `iconos.svg`:
+se usan con `<svg class="ic"><use href="/iconos.svg#mazo"/></svg>` y toman el color del texto.
+El tooltip del mapa (oscuro, estilo INEI) se personaliza al inicio de `tooltip.js`.
 
 ## Editar los textos del tooltip (datos.xlsx)
 

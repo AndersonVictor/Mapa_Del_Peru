@@ -5,17 +5,21 @@
 // =====================================================================================
 (function () {
   const COLOR = {
-    mujer: '#ec6f9b', varon: '#0d47a1',
-    titular: '#2e7d32', supern: '#fb8c00', provis: '#8e24aa',
-    sala: '#e53935', jesp: '#f9a825', jpl: '#00acc1',
-    carga: '#fb8c00', ingresos: '#1e88e5', resueltos: '#43a047',
-    programadas: '#42a5f5', atendidas: '#ff7043', suspendidas: '#1a237e',
-    granate: '#7f1d2d', oro: '#b8935a',
+    varon: '#0056a1', mujer: '#33b3a9',
+    titular: '#16a34a', supern: '#f59e0b', provis: '#8b5cf6',
+    sala: '#1e3a8a', jesp: '#0a84d0', jpl: '#8a80f5',
+    carga: '#f59e0b', ingresos: '#0a84d0', resueltos: '#16a34a',
+    programadas: '#93c5fd', atendidas: '#0056a1', suspendidas: '#e05d6f',
+    granate: '#7f1d2d', gris: '#cbd5e1',
   };
-  const PALETA = ['#00acc1', '#1565c0', '#6a1b9a', '#d81b60', '#f9a825', '#6d0f1f', '#43a047', '#8d6e63', '#ff7043', '#5c6bc0'];
+  const PALETA = ['#0056a1', '#33b3a9', '#8a80f5', '#f59e0b', '#e05d6f', '#0a84d0', '#16a34a', '#7f1d2d', '#94a3b8', '#c084fc'];
+  const TEXTO = '#111827', SUAVE = '#6b7280', REJILLA = '#eef0f4';
+  const icono = (id, color) => `<svg class="ic" style="color:${color}"><use href="/iconos.svg#${id}"/></svg>`;
 
   const N = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
-  const fmt = n => (n == null || isNaN(n) ? '–' : Number(n).toLocaleString('es-PE', { maximumFractionDigits: 1 }));
+  // números como el INEI: 1 074 · 49,4
+  const fmt = n => (n == null || isNaN(n) ? '–' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 1 })
+    .replace(/,/g, ' ').replace('.', ','));
   // ejes: 1 200 000 -> "1.2 M", 35 000 -> "35 mil"
   const corto = v => Math.abs(v) >= 1e6 ? fmt(v / 1e6) + ' M' : Math.abs(v) >= 1e3 ? fmt(v / 1e3) + ' mil' : fmt(v);
   const num = v => (typeof v === 'number' ? v : parseFloat(v) || 0);
@@ -32,10 +36,11 @@
 
   // --- utilidades de ECharts ---
   const BASE = {
-    textStyle: { fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' },
-    animationDuration: 450,
-    tooltip: { confine: true },
+    textStyle: { fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', color: SUAVE },
+    animationDuration: 500,
   };
+  const TIP = { confine: true, backgroundColor: 'rgba(17,24,39,.94)', borderColor: 'rgba(245,158,11,.45)', borderWidth: 1,
+    padding: [8, 12], textStyle: { color: '#fff', fontSize: 12 }, extraCssText: 'border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);' };
   function grafico(id, opcion, alClic) {
     const el = $(id);
     if (!el) return null;
@@ -44,19 +49,38 @@
       c = charts[id] = echarts.init(el);
       if (alClic) c.on('click', alClic);
     }
-    c.setOption(Object.assign({}, BASE, opcion), true);
+    // estilo común: tooltip oscuro y barras con esquinas redondeadas (las apiladas, rectas)
+    const op = Object.assign({}, BASE, opcion, { tooltip: Object.assign({}, TIP, opcion.tooltip) });
+    const horizontal = !Array.isArray(op.yAxis) && op.yAxis?.type === 'category';
+    for (const s of [].concat(op.series || [])) {
+      if (s.type !== 'bar') continue;
+      s.barMaxWidth = s.barMaxWidth || 34;
+      if (!s.stack) s.itemStyle = Object.assign({ borderRadius: horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0] }, s.itemStyle);
+    }
+    c.setOption(op, true);
     return c;
   }
-  const leyenda = (extra) => Object.assign({ top: 0, itemWidth: 12, itemHeight: 10, textStyle: { fontSize: 11 } }, extra);
+  const leyenda = (extra) => Object.assign({ top: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 14, textStyle: { fontSize: 11.5, color: SUAVE } }, extra);
   const rejilla = (extra) => Object.assign({ left: 8, right: 14, top: 32, bottom: 6, containLabel: true }, extra);
-  const ejeNum = (extra) => Object.assign({ type: 'value', axisLabel: { fontSize: 10, formatter: corto }, splitLine: { lineStyle: { type: 'dashed', color: '#e5dccf' } } }, extra);
-  const ejeCat = (datos, extra) => Object.assign({ type: 'category', data: datos, axisLabel: { fontSize: 10 }, axisTick: { show: false } }, extra);
+  const ejeNum = (extra) => Object.assign({ type: 'value', axisLabel: { fontSize: 10.5, color: '#9ca3af', formatter: corto },
+    splitLine: { lineStyle: { color: REJILLA } }, axisLine: { show: false } }, extra);
+  const ejeCat = (datos, extra) => Object.assign({ type: 'category', data: datos, axisLabel: { fontSize: 11, color: SUAVE },
+    axisTick: { show: false }, axisLine: { lineStyle: { color: '#e5e7eb' } } }, extra);
+  // Dona al estilo INEI: anillo grueso, separaciones, sin textos encima (la leyenda va debajo, en HTML)
   const dona = (datos, extra) => Object.assign({
-    type: 'pie', radius: ['38%', '74%'], center: ['50%', '56%'], avoidLabelOverlap: true,
-    itemStyle: { borderColor: '#fff', borderWidth: 2 },
-    label: { position: 'inside', formatter: p => p.value ? `${p.value}\n${Math.round(p.percent)}%` : '', fontSize: 10.5,
-             fontWeight: 'bold', color: '#fff', lineHeight: 13 }, data: datos,
+    type: 'pie', radius: ['60%', '88%'], center: ['50%', '50%'], padAngle: 2.5,
+    itemStyle: { borderRadius: 6 }, label: { show: false }, labelLine: { show: false },
+    emphasis: { scale: true, scaleSize: 4 }, data: datos,
   }, extra);
+  // Leyenda debajo de la dona: ícono (o color), nombre, número grande y porcentaje
+  function leyendaDona(id, items) {
+    const el = $(id + '-ley');
+    if (!el) return;
+    const total = items.reduce((s, x) => s + x.value, 0);
+    el.innerHTML = items.map(x => `<div><div class="t">${x.icono ? icono(x.icono, x.color) : `<i style="background:${x.color}"></i>`}${esc(x.name)}</div>
+      <b>${fmt(x.value)}</b><small>${total ? fmt(x.value / total * 100) : 0}%</small></div>`).join('');
+  }
+  const tipDona = { trigger: 'item', formatter: p => `<b>${esc(p.name)}</b><br>${fmt(p.value)} · ${fmt(p.percent)}%` };
 
   // --- filtro por zona del mapa ---
   const enSel = r => !sel || (sel[0] === '7' ? String(r.prov_id || '').slice(1, 3) === sel.slice(1, 3)
@@ -172,46 +196,51 @@
       tooltip: { trigger: 'axis' }, legend: leyenda({ right: 0 }), grid: rejilla(),
       xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
       series: [
-        { name: 'Mujeres', type: 'bar', color: COLOR.mujer, data: ps.map(p => barra(p.filas.filter(esMujer).length, p, COLOR.mujer)), label: { show: true, position: 'top', fontSize: 10 } },
-        { name: 'Varones', type: 'bar', color: COLOR.varon, data: ps.map(p => barra(p.filas.filter(esVaron).length, p, COLOR.varon)), label: { show: true, position: 'top', fontSize: 10 } },
+        { name: 'Varones', type: 'bar', color: COLOR.varon, data: ps.map(p => barra(p.filas.filter(esVaron).length, p, COLOR.varon)), label: { show: true, position: 'top', fontSize: 10.5, fontWeight: 700, color: TEXTO } },
+        { name: 'Mujeres', type: 'bar', color: COLOR.mujer, data: ps.map(p => barra(p.filas.filter(esMujer).length, p, COLOR.mujer)), label: { show: true, position: 'top', fontSize: 10.5, fontWeight: 700, color: TEXTO } },
       ],
     }, clicProv);
 
-    const muj = m.filter(esMujer).length, var_ = m.filter(esVaron).length;
-    grafico('c-genero', {
-      tooltip: { trigger: 'item' }, legend: leyenda(),
-      series: [dona([{ name: 'Mujeres', value: muj, itemStyle: { color: COLOR.mujer } }, { name: 'Varones', value: var_, itemStyle: { color: COLOR.varon } }])],
-    });
+    const sexo = [
+      { name: 'Varones', value: m.filter(esVaron).length, color: COLOR.varon, icono: 'hombre' },
+      { name: 'Mujeres', value: m.filter(esMujer).length, color: COLOR.mujer, icono: 'mujer' },
+    ];
+    grafico('c-genero', { tooltip: tipDona, series: [dona(sexo.map(x => ({ name: x.name, value: x.value, itemStyle: { color: x.color } })))] });
+    leyendaDona('c-genero', sexo);
 
-    grafico('c-inst-genero', {
-      tooltip: { trigger: 'axis' }, legend: leyenda(), grid: rejilla(),
-      xAxis: ejeCat(INST), yAxis: ejeNum(),
-      series: [
-        { name: 'Mujeres', type: 'bar', color: COLOR.mujer, data: INST.map(i => m.filter(r => inst(r) === i && esMujer(r)).length), label: { show: true, position: 'top', fontSize: 10 } },
-        { name: 'Varones', type: 'bar', color: COLOR.varon, data: INST.map(i => m.filter(r => inst(r) === i && esVaron(r)).length), label: { show: true, position: 'top', fontSize: 10 } },
-      ],
-    });
-
+    // Por instancia: una barra por instancia con número y porcentaje encima (detalle por sexo en el tooltip)
     const colInst = { 'SALA': COLOR.sala, 'J. ESP.': COLOR.jesp, 'JPL': COLOR.jpl };
+    const nomInst = { 'J. ESP.': 'Juzgados\nespecializados', 'SALA': 'Salas', 'JPL': 'Juzgados de\npaz letrado' };
+    const porInst = INST.map(i => m.filter(r => inst(r) === i));
+    grafico('c-inst', {
+      tooltip: { trigger: 'item', formatter: p => { const f = porInst[p.dataIndex];
+        return `<b>${nomInst[INST[p.dataIndex]].replace('\n', ' ')}</b><br>${f.length} en total<br>` +
+               `<span style="color:#6fa8d4">Varones</span> ${f.filter(esVaron).length} · <span style="color:#33b3a9">Mujeres</span> ${f.filter(esMujer).length}`; } },
+      grid: rejilla({ top: 46, bottom: 4 }), xAxis: ejeCat(INST.map(i => nomInst[i]), { axisLabel: { fontSize: 10.5, color: SUAVE, lineHeight: 13, interval: 0 } }),
+      yAxis: ejeNum({ show: false }),
+      series: [{ type: 'bar', barMaxWidth: 46, data: porInst.map((f, k) => ({ value: f.length, itemStyle: { color: colInst[INST[k]] } })),
+        label: { show: true, position: 'top', formatter: p => `{v|${fmt(p.value)}}\n{p|${m.length ? fmt(p.value / m.length * 100) : 0}%}`,
+          rich: { v: { fontSize: 15, fontWeight: 800, color: TEXTO, lineHeight: 18 }, p: { fontSize: 11.5, fontWeight: 600, color: '#9ca3af' } } } }],
+    });
+
     grafico('c-inst-prov', {
       tooltip: { trigger: 'axis' }, legend: leyenda(), grid: rejilla(),
       xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
       series: ['SALA', 'J. ESP.', 'JPL'].map(i => ({ name: i, type: 'bar', stack: 'inst', color: colInst[i],
         data: ps.map(p => barra(p.filas.filter(r => inst(r) === i).length || null, p, colInst[i])),
-        label: { show: true, fontSize: 10, color: '#fff', formatter: e => e.value || '' } })),
+        label: { show: true, fontSize: 10, fontWeight: 700, color: '#fff', formatter: e => e.value > 1 ? e.value : '' } })),
     }, clicProv);
 
-    const conds = [['T', 'Titulares', COLOR.titular], ['S', 'Supernumerarios', COLOR.supern], ['P', 'Provisionales', COLOR.provis]];
-    grafico('c-cond', {
-      tooltip: { trigger: 'item' }, legend: leyenda(),
-      series: [dona(conds.map(([k, n, c]) => ({ name: n, value: m.filter(r => cond(r) === k).length, itemStyle: { color: c } })))],
-    });
+    const conds = [['T', 'Titulares', COLOR.titular, 'titular'], ['S', 'Supernumerarios', COLOR.supern, 'supernumerario'], ['P', 'Provisionales', COLOR.provis, 'provisional']];
+    const porCond = conds.map(([k, n, c, ic]) => ({ name: n, value: m.filter(r => cond(r) === k).length, color: c, icono: ic }));
+    grafico('c-cond', { tooltip: tipDona, series: [dona(porCond.map(x => ({ name: x.name, value: x.value, itemStyle: { color: x.color } })))] });
+    leyendaDona('c-cond', porCond);
     grafico('c-cond-prov', {
       tooltip: { trigger: 'axis' }, legend: leyenda(), grid: rejilla(),
       xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
       series: conds.map(([k, n, c]) => ({ name: n, type: 'bar', stack: 'cond', color: c,
         data: ps.map(p => barra(p.filas.filter(r => cond(r) === k).length || null, p, c)),
-        label: { show: true, fontSize: 10, color: '#fff', formatter: e => e.value || '' } })),
+        label: { show: true, fontSize: 10, fontWeight: 700, color: '#fff', formatter: e => e.value > 1 ? e.value : '' } })),
     }, clicProv);
 
     tablaMagistrados(m);
@@ -223,10 +252,10 @@
     const q = N(buscar?.value);
     const filas = m.filter(r => !q || N([r.APELLIDOS_NOMBRES, r.ESPECIALIDAD, r.SEDE_DISTRITO, r.PROVINCIA, r.INSTANCIA].join(' ')).includes(q))
       .sort((a, b) => String(a.APELLIDOS_NOMBRES).localeCompare(String(b.APELLIDOS_NOMBRES), 'es'));
-    const chip = (t, c) => `<span class="chip" style="background:${c}">${esc(t)}</span>`;
+    const chip = (t, c) => `<span class="chip" style="background:${c}1f;color:${c}">${esc(t)}</span>`;
     const cc = { T: COLOR.titular, S: COLOR.supern, P: COLOR.provis };
     cuerpo.innerHTML = filas.map(r => `<tr>
-      <td>${esc(r.APELLIDOS_NOMBRES)}</td><td>${esMujer(r) ? '👩 Mujer' : '👨 Varón'}</td>
+      <td>${esc(r.APELLIDOS_NOMBRES)}</td><td><span class="sexo">${esMujer(r) ? icono('mujer', COLOR.mujer) + 'Mujer' : icono('hombre', COLOR.varon) + 'Varón'}</span></td>
       <td>${esc(inst(r))}</td><td>${esc(r.ESPECIALIDAD)}${r.NUMERO ? ' <small>' + esc(r.NUMERO) + '</small>' : ''}</td>
       <td>${esc(r.SEDE_DISTRITO)} <small>· ${esc(r.PROVINCIA)}</small></td>
       <td>${chip(r.CONDICION, cc[cond(r)] || '#777')}</td></tr>`).join('') ||
@@ -345,10 +374,10 @@
 
   // ================= 5) Personal jurisdiccional =================
   const REGIMENES = [
-    { n: 'D.L. 728', cols: ['DL_728'], c: '#1565c0' },
-    { n: 'D.L. 1057 (CAS)', cols: ['CAS', 'RECAS'], c: '#f9a825' },
-    { n: 'Ley 29277', cols: ['LEY_29277'], c: '#2e7d32' },
-    { n: 'D.L. 276', cols: ['DL_276'], c: '#e53935' },
+    { n: 'D.L. 728', cols: ['DL_728'], c: '#0056a1' },
+    { n: 'D.L. 1057 (CAS)', cols: ['CAS', 'RECAS'], c: '#f59e0b' },
+    { n: 'Ley 29277', cols: ['LEY_29277'], c: '#33b3a9' },
+    { n: 'D.L. 276', cols: ['DL_276'], c: '#e05d6f' },
   ];
   function pintarPersonal() {
     const P = T.Personal || [];
@@ -357,12 +386,12 @@
     const total = REGIMENES.reduce((s, g) => s + tot(g), 0);
     const e = $('k-personal'); if (e) e.textContent = fmt(total);
     const cards = $('pe-cards');
-    if (cards) cards.innerHTML = REGIMENES.map(g => `<div class="reg"><div class="reg-h" style="background:${g.c}">${esc(g.n)}</div>
-      <div class="reg-v">${fmt(tot(g))}</div><div class="reg-p">${total ? fmt(tot(g) / total * 100) : 0}% del personal</div></div>`).join('');
-    grafico('c-pe-dona', {
-      tooltip: { trigger: 'item', valueFormatter: fmt }, legend: leyenda({ orient: 'vertical', right: 0, top: 'middle' }),
-      series: [dona(REGIMENES.map(g => ({ name: g.n, value: tot(g), itemStyle: { color: g.c } })), { center: ['40%', '52%'], radius: ['45%', '72%'] })],
-    });
+    const pct = g => total ? tot(g) / total * 100 : 0;
+    if (cards) cards.innerHTML = REGIMENES.map(g => `<div class="reg" style="--c:${g.c}"><div class="reg-h">${esc(g.n)}</div>
+      <div class="reg-v">${fmt(tot(g))}</div><div class="reg-p"><i style="width:${pct(g)}%"></i></div>
+      <small>${fmt(pct(g))}% del personal</small></div>`).join('');
+    grafico('c-pe-dona', { tooltip: tipDona, series: [dona(REGIMENES.map(g => ({ name: g.n, value: tot(g), itemStyle: { color: g.c } })))] });
+    leyendaDona('c-pe-dona', REGIMENES.map(g => ({ name: g.n, value: tot(g), color: g.c })));
     const top = P.map(r => ({ cargo: r.CARGO, t: REGIMENES.reduce((s, g) => s + deReg(r, g), 0), r }))
       .sort((a, b) => b.t - a.t).slice(0, 15).reverse();
     grafico('c-pe-cargos', {
