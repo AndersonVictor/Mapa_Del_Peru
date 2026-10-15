@@ -1,0 +1,415 @@
+// =====================================================================================
+//  GRÁFICOS DEL DASHBOARD (Apache ECharts). Una función por pestaña.
+//  Los datos vienen de dashboard.xlsx (vía /api/jueces -> tablas) y aquí se suman.
+//  Colores: cámbialos en COLOR.
+// =====================================================================================
+(function () {
+  const COLOR = {
+    mujer: '#ec6f9b', varon: '#0d47a1',
+    titular: '#2e7d32', supern: '#fb8c00', provis: '#8e24aa',
+    sala: '#e53935', jesp: '#f9a825', jpl: '#00acc1',
+    carga: '#fb8c00', ingresos: '#1e88e5', resueltos: '#43a047',
+    programadas: '#42a5f5', atendidas: '#ff7043', suspendidas: '#1a237e',
+    granate: '#7f1d2d', oro: '#b8935a',
+  };
+  const PALETA = ['#00acc1', '#1565c0', '#6a1b9a', '#d81b60', '#f9a825', '#6d0f1f', '#43a047', '#8d6e63', '#ff7043', '#5c6bc0'];
+
+  const N = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+  const fmt = n => (n == null || isNaN(n) ? '–' : Number(n).toLocaleString('es-PE', { maximumFractionDigits: 1 }));
+  // ejes: 1 200 000 -> "1.2 M", 35 000 -> "35 mil"
+  const corto = v => Math.abs(v) >= 1e6 ? fmt(v / 1e6) + ' M' : Math.abs(v) >= 1e3 ? fmt(v / 1e3) + ' mil' : fmt(v);
+  const num = v => (typeof v === 'number' ? v : parseFloat(v) || 0);
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const unicos = (xs) => [...new Set(xs)];
+  const $ = id => document.getElementById(id);
+
+  let T = {};                 // tablas de dashboard.xlsx
+  let sel = null;             // id de la zona elegida en el mapa (7/8/9...) o null
+  let alClicProvincia = null; // callback: clic en una barra de provincia -> filtrar el mapa
+  const charts = {};
+  const pintados = {};
+  let tabActual = null;
+
+  // --- utilidades de ECharts ---
+  const BASE = {
+    textStyle: { fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' },
+    animationDuration: 450,
+    tooltip: { confine: true },
+  };
+  function grafico(id, opcion, alClic) {
+    const el = $(id);
+    if (!el) return null;
+    let c = charts[id];
+    if (!c) {
+      c = charts[id] = echarts.init(el);
+      if (alClic) c.on('click', alClic);
+    }
+    c.setOption(Object.assign({}, BASE, opcion), true);
+    return c;
+  }
+  const leyenda = (extra) => Object.assign({ top: 0, itemWidth: 12, itemHeight: 10, textStyle: { fontSize: 11 } }, extra);
+  const rejilla = (extra) => Object.assign({ left: 8, right: 14, top: 32, bottom: 6, containLabel: true }, extra);
+  const ejeNum = (extra) => Object.assign({ type: 'value', axisLabel: { fontSize: 10, formatter: corto }, splitLine: { lineStyle: { type: 'dashed', color: '#e5dccf' } } }, extra);
+  const ejeCat = (datos, extra) => Object.assign({ type: 'category', data: datos, axisLabel: { fontSize: 10 }, axisTick: { show: false } }, extra);
+  const dona = (datos, extra) => Object.assign({
+    type: 'pie', radius: ['38%', '74%'], center: ['50%', '56%'], avoidLabelOverlap: true,
+    itemStyle: { borderColor: '#fff', borderWidth: 2 },
+    label: { position: 'inside', formatter: p => p.value ? `${p.value}\n${Math.round(p.percent)}%` : '', fontSize: 10.5,
+             fontWeight: 'bold', color: '#fff', lineHeight: 13 }, data: datos,
+  }, extra);
+
+  // --- filtro por zona del mapa ---
+  const enSel = r => !sel || (sel[0] === '7' ? String(r.prov_id || '').slice(1, 3) === sel.slice(1, 3)
+                            : sel[0] === '8' ? r.prov_id === sel : r.dist_id === sel);
+  const esVaron = r => N(r.SEXO).startsWith('VAR');
+  const esMujer = r => N(r.SEXO).startsWith('MUJ');
+  const cond = r => N(r.CONDICION)[0]; // T / S / P
+  const inst = r => { const i = N(r.INSTANCIA); return i === 'SALA' ? 'SALA' : i === 'JPL' ? 'JPL' : 'J. ESP.'; };
+  const INST = ['J. ESP.', 'SALA', 'JPL'];
+
+  function provincias() {
+    // provincias con jueces, de mayor a menor
+    const m = T.Magistrados || [];
+    const ps = unicos(m.map(r => r.PROVINCIA)).map(nombre => {
+      const filas = m.filter(r => r.PROVINCIA === nombre);
+      return { nombre, id: filas[0]?.prov_id, filas };
+    });
+    return ps.sort((a, b) => b.filas.length - a.filas.length);
+  }
+  // ¿la provincia contiene la zona elegida? (para atenuar las demás barras)
+  const resaltada = p => !sel || p.filas.some(enSel);
+  const barra = (v, p, color) => ({ value: v, itemStyle: { color, opacity: resaltada(p) ? 1 : 0.25 } });
+
+  // ================= Tarjetas de arriba =================
+  function kpis(nombreSel) {
+    const m = (T.Magistrados || []).filter(enSel), o = (T.Organos || []).filter(enSel);
+    const set = (id, v) => { const e = $(id); if (e) e.textContent = typeof v === 'number' ? fmt(v) : v; };
+    set('k-total', m.length); set('k-organos', o.length);
+    set('k-var', m.filter(esVaron).length); set('k-muj', m.filter(esMujer).length);
+    set('k-tit', m.filter(r => cond(r) === 'T').length);
+    set('k-sup', m.filter(r => cond(r) === 'S').length);
+    set('k-prov', m.filter(r => cond(r) === 'P').length);
+    const f = $('filtro-activo');
+    if (f) { f.hidden = !sel; set('k-sel', nombreSel || ''); }
+  }
+
+  // ================= 1) Proyecciones poblacionales =================
+  function pintarPoblacion() {
+    const P = T.Poblacion || [];
+    if (!P.length) return;
+    const anios = unicos(P.map(r => r['AÑO'])).sort();
+    const selAnio = $('pob-anio');
+    if (selAnio && !selAnio.options.length) {
+      selAnio.innerHTML = anios.map(a => `<option>${a}</option>`).join('');
+      selAnio.onchange = () => { pintados.pob = false; pintarPoblacion(); };
+    }
+    const anio = +(selAnio?.value || anios[0]);
+    const total = r => num(r.VARONES) + num(r.MUJERES);
+    const provs = unicos(P.map(r => r.PROVINCIA));
+    const pobDe = (p, a) => P.filter(r => r.PROVINCIA === p && r['AÑO'] === a).reduce((s, r) => s + total(r), 0);
+    provs.sort((a, b) => pobDe(b, anio) - pobDe(a, anio));
+
+    // Área apilada: población total proyectada por provincia
+    grafico('c-pob-area', {
+      color: PALETA, tooltip: { trigger: 'axis', valueFormatter: fmt },
+      legend: leyenda(), grid: rejilla({ top: 58 }),
+      xAxis: ejeCat(anios, { boundaryGap: false }), yAxis: ejeNum(),
+      series: provs.slice().reverse().map(p => ({ name: p, type: 'line', stack: 'pob', areaStyle: { opacity: 0.85 },
+        symbol: 'none', lineStyle: { width: 1 }, data: anios.map(a => pobDe(p, a)) })),
+    });
+    // Barras: población por provincia en el año elegido
+    const asc = provs.slice().reverse();
+    grafico('c-pob-barras', {
+      tooltip: { trigger: 'axis', valueFormatter: fmt }, grid: rejilla({ top: 8, right: 60 }),
+      xAxis: ejeNum(), yAxis: ejeCat(asc),
+      series: [{ type: 'bar', barWidth: '62%', data: asc.map((p, i) => ({ value: pobDe(p, anio), itemStyle: { color: PALETA[(provs.length - 1 - i) % PALETA.length] } })),
+        label: { show: true, position: 'right', formatter: p => fmt(p.value), fontSize: 10 } }],
+    });
+    // Jueces por cada 100 mil habitantes
+    const M = T.Magistrados || [];
+    const filas = provs.map(p => {
+      const j = M.filter(r => N(r.PROVINCIA) === N(p)).length, pob = pobDe(p, anio);
+      return { nombre: p, valor: pob ? j / pob * 1e5 : 0, j, pob };
+    });
+    const jt = filas.reduce((s, f) => s + f.j, 0), pt = filas.reduce((s, f) => s + f.pob, 0);
+    filas.push({ nombre: 'CSJ Junín (total)', valor: pt ? jt / pt * 1e5 : 0, j: jt, pob: pt, ref: true });
+    for (const r of T.Referencias || [])
+      if (num(r.POBLACION)) filas.push({ nombre: r.CATEGORIA, valor: num(r.JUECES) / num(r.POBLACION) * 1e5, j: num(r.JUECES), pob: num(r.POBLACION), ref: true });
+    filas.sort((a, b) => a.valor - b.valor);
+    grafico('c-pob-100k', {
+      tooltip: { trigger: 'item', formatter: p => { const f = filas[p.dataIndex];
+        return `<b>${esc(f.nombre)}</b><br>${fmt(f.valor)} jueces por 100 mil hab.<br>${fmt(f.j)} jueces · ${fmt(f.pob)} hab.`; } },
+      grid: rejilla({ top: 8, right: 40 }), xAxis: ejeNum(), yAxis: ejeCat(filas.map(f => f.nombre)),
+      series: [{ type: 'bar', barWidth: '62%', data: filas.map(f => ({ value: +f.valor.toFixed(1), itemStyle: { color: f.ref ? COLOR.granate : '#1e88e5' } })),
+        label: { show: true, position: 'right', fontSize: 10, formatter: p => fmt(p.value) } }],
+    });
+    // Mini gráficos: varones y mujeres por provincia
+    const cont = $('pob-mini');
+    if (cont && cont.dataset.provs !== provs.join('|')) {
+      cont.dataset.provs = provs.join('|');
+      cont.innerHTML = provs.map((p, i) => `<div class="mini"><div class="mini-t">${esc(p)}</div><div class="ch-mini" id="c-mini-${i}"></div></div>`).join('');
+    }
+    provs.forEach((p, i) => {
+      const filasP = anios.map(a => P.find(r => r.PROVINCIA === p && r['AÑO'] === a) || {});
+      grafico('c-mini-' + i, {
+        tooltip: { trigger: 'axis', valueFormatter: fmt }, grid: { left: 4, right: 10, top: 8, bottom: 4, containLabel: true },
+        xAxis: ejeCat(anios, { axisLabel: { fontSize: 9 } }), yAxis: ejeNum({ scale: true, axisLabel: { fontSize: 9, formatter: v => fmt(v / 1000) + ' mil' } }),
+        series: [
+          { name: 'Mujeres', type: 'line', data: filasP.map(r => num(r.MUJERES)), color: COLOR.mujer, symbolSize: 5 },
+          { name: 'Varones', type: 'line', data: filasP.map(r => num(r.VARONES)), color: COLOR.varon, symbolSize: 5 },
+        ],
+      });
+    });
+  }
+
+  // ================= 2) Resumen y detalle por provincia =================
+  function pintarResumen() {
+    const todos = T.Magistrados || [], m = todos.filter(enSel), ps = provincias();
+    const nombres = ps.map(p => p.nombre);
+    const clicProv = e => { const p = ps[e.dataIndex]; if (p?.id) alClicProvincia?.(p.id); };
+
+    grafico('c-prov-sexo', {
+      tooltip: { trigger: 'axis' }, legend: leyenda({ right: 0 }), grid: rejilla(),
+      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
+      series: [
+        { name: 'Mujeres', type: 'bar', color: COLOR.mujer, data: ps.map(p => barra(p.filas.filter(esMujer).length, p, COLOR.mujer)), label: { show: true, position: 'top', fontSize: 10 } },
+        { name: 'Varones', type: 'bar', color: COLOR.varon, data: ps.map(p => barra(p.filas.filter(esVaron).length, p, COLOR.varon)), label: { show: true, position: 'top', fontSize: 10 } },
+      ],
+    }, clicProv);
+
+    const muj = m.filter(esMujer).length, var_ = m.filter(esVaron).length;
+    grafico('c-genero', {
+      tooltip: { trigger: 'item' }, legend: leyenda(),
+      series: [dona([{ name: 'Mujeres', value: muj, itemStyle: { color: COLOR.mujer } }, { name: 'Varones', value: var_, itemStyle: { color: COLOR.varon } }])],
+    });
+
+    grafico('c-inst-genero', {
+      tooltip: { trigger: 'axis' }, legend: leyenda(), grid: rejilla(),
+      xAxis: ejeCat(INST), yAxis: ejeNum(),
+      series: [
+        { name: 'Mujeres', type: 'bar', color: COLOR.mujer, data: INST.map(i => m.filter(r => inst(r) === i && esMujer(r)).length), label: { show: true, position: 'top', fontSize: 10 } },
+        { name: 'Varones', type: 'bar', color: COLOR.varon, data: INST.map(i => m.filter(r => inst(r) === i && esVaron(r)).length), label: { show: true, position: 'top', fontSize: 10 } },
+      ],
+    });
+
+    const colInst = { 'SALA': COLOR.sala, 'J. ESP.': COLOR.jesp, 'JPL': COLOR.jpl };
+    grafico('c-inst-prov', {
+      tooltip: { trigger: 'axis' }, legend: leyenda(), grid: rejilla(),
+      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
+      series: ['SALA', 'J. ESP.', 'JPL'].map(i => ({ name: i, type: 'bar', stack: 'inst', color: colInst[i],
+        data: ps.map(p => barra(p.filas.filter(r => inst(r) === i).length || null, p, colInst[i])),
+        label: { show: true, fontSize: 10, color: '#fff', formatter: e => e.value || '' } })),
+    }, clicProv);
+
+    const conds = [['T', 'Titulares', COLOR.titular], ['S', 'Supernumerarios', COLOR.supern], ['P', 'Provisionales', COLOR.provis]];
+    grafico('c-cond', {
+      tooltip: { trigger: 'item' }, legend: leyenda(),
+      series: [dona(conds.map(([k, n, c]) => ({ name: n, value: m.filter(r => cond(r) === k).length, itemStyle: { color: c } })))],
+    });
+    grafico('c-cond-prov', {
+      tooltip: { trigger: 'axis' }, legend: leyenda(), grid: rejilla(),
+      xAxis: ejeCat(nombres, { axisLabel: { fontSize: 10, interval: 0, rotate: nombres.length > 6 ? 25 : 0 } }), yAxis: ejeNum(),
+      series: conds.map(([k, n, c]) => ({ name: n, type: 'bar', stack: 'cond', color: c,
+        data: ps.map(p => barra(p.filas.filter(r => cond(r) === k).length || null, p, c)),
+        label: { show: true, fontSize: 10, color: '#fff', formatter: e => e.value || '' } })),
+    }, clicProv);
+
+    tablaMagistrados(m);
+  }
+
+  function tablaMagistrados(m) {
+    const cuerpo = $('t-mag'), buscar = $('t-mag-buscar');
+    if (!cuerpo) return;
+    const q = N(buscar?.value);
+    const filas = m.filter(r => !q || N([r.APELLIDOS_NOMBRES, r.ESPECIALIDAD, r.SEDE_DISTRITO, r.PROVINCIA, r.INSTANCIA].join(' ')).includes(q))
+      .sort((a, b) => String(a.APELLIDOS_NOMBRES).localeCompare(String(b.APELLIDOS_NOMBRES), 'es'));
+    const chip = (t, c) => `<span class="chip" style="background:${c}">${esc(t)}</span>`;
+    const cc = { T: COLOR.titular, S: COLOR.supern, P: COLOR.provis };
+    cuerpo.innerHTML = filas.map(r => `<tr>
+      <td>${esc(r.APELLIDOS_NOMBRES)}</td><td>${esMujer(r) ? '👩 Mujer' : '👨 Varón'}</td>
+      <td>${esc(inst(r))}</td><td>${esc(r.ESPECIALIDAD)}${r.NUMERO ? ' <small>' + esc(r.NUMERO) + '</small>' : ''}</td>
+      <td>${esc(r.SEDE_DISTRITO)} <small>· ${esc(r.PROVINCIA)}</small></td>
+      <td>${chip(r.CONDICION, cc[cond(r)] || '#777')}</td></tr>`).join('') ||
+      '<tr><td colspan="6" class="vacio">Sin resultados</td></tr>';
+    const n = $('t-mag-n');
+    if (n) n.textContent = `${filas.length} de ${m.length}`;
+    if (buscar && !buscar.dataset.listo) {
+      buscar.dataset.listo = 1;
+      buscar.oninput = () => tablaMagistrados((T.Magistrados || []).filter(enSel));
+    }
+  }
+
+  // ================= 3) Carga procesal =================
+  function pintarCarga() {
+    const C = T.Carga_Procesal || [];
+    const anios = unicos(C.map(r => r['AÑO'])).sort();
+    const esps = unicos(C.map(r => r.ESPECIALIDAD)).sort((a, b) => String(a).localeCompare(String(b), 'es'));
+    const suma = (a, campo, esp) => C.filter(r => r['AÑO'] === a && (!esp || r.ESPECIALIDAD === esp)).reduce((s, r) => s + num(r[campo]), 0);
+    const lin = { type: 'line', symbolSize: 6, smooth: false };
+
+    grafico('c-cp-anual', {
+      tooltip: { trigger: 'axis', valueFormatter: fmt }, legend: leyenda(), grid: rejilla(),
+      xAxis: ejeCat(anios), yAxis: ejeNum(),
+      series: [['Carga procesal', 'CARGA_PROCESAL', COLOR.carga], ['Ingresos', 'INGRESOS', COLOR.ingresos], ['Resueltos', 'RESUELTOS', COLOR.resueltos]]
+        .map(([n, c, col]) => ({ name: n, type: 'bar', color: col, data: anios.map(a => suma(a, c)) })),
+    });
+    grafico('c-cp-resueltos', {
+      color: PALETA, tooltip: { trigger: 'axis', valueFormatter: fmt }, legend: leyenda(), grid: rejilla({ top: 58 }),
+      xAxis: ejeCat(anios), yAxis: ejeNum(),
+      series: esps.map(e => ({ name: e, type: 'bar', data: anios.map(a => suma(a, 'RESUELTOS', e)) })),
+    });
+    grafico('c-cp-100', {
+      color: PALETA, tooltip: { trigger: 'axis', valueFormatter: v => fmt(v) + '%' }, legend: leyenda(), grid: rejilla({ top: 58 }),
+      xAxis: ejeCat(anios), yAxis: ejeNum({ max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } }),
+      series: esps.map(e => ({ name: e, type: 'bar', stack: 'p', barWidth: '70%',
+        data: anios.map(a => { const t = suma(a, 'CARGA_PROCESAL'); return t ? +(suma(a, 'CARGA_PROCESAL', e) / t * 100).toFixed(1) : 0; }) })),
+    });
+    grafico('c-cp-ingresos', {
+      color: PALETA, tooltip: { trigger: 'axis', valueFormatter: fmt }, legend: leyenda(), grid: rejilla({ top: 58 }),
+      xAxis: ejeCat(anios), yAxis: ejeNum(),
+      series: esps.map(e => Object.assign({ name: e, data: anios.map(a => suma(a, 'INGRESOS', e)) }, lin)),
+    });
+    grafico('c-cp-tasa', {
+      color: PALETA, tooltip: { trigger: 'axis', valueFormatter: v => v == null ? '–' : fmt(v) + '%' }, legend: leyenda(), grid: rejilla({ top: 58 }),
+      xAxis: ejeCat(anios), yAxis: ejeNum({ axisLabel: { formatter: '{value}%', fontSize: 10 } }),
+      series: esps.map(e => Object.assign({ name: e, connectNulls: false,
+        data: anios.map(a => { const i = suma(a, 'INGRESOS', e); return i ? +(suma(a, 'RESUELTOS', e) / i * 100).toFixed(1) : null; }) }, lin)),
+    });
+    // Sobrecarga: % por encima de la carga máxima
+    const S = (T.Sobrecarga || []).map(r => ({ nombre: r.ORGANO_JURISDICCIONAL, max: num(r.CARGA_MAXIMA), proy: num(r.CARGA_PROYECTADA) }))
+      .map(r => Object.assign(r, { pct: r.max ? (r.proy / r.max - 1) * 100 : 0 })).sort((a, b) => a.pct - b.pct);
+    const corto = s => String(s).replace(/JUZGADO/g, 'J.').replace(/INVESTIGACI[OÓ]N PREPARATORIA/g, 'INV. PREP.')
+      .replace(/SUPRAPROVINCIAL ESPECIALIZADO EN DELITOS? DE CORRUPCI[OÓ]N DE FUNCIONARIOS/g, 'SUPRAPROV. CORRUPCIÓN');
+    grafico('c-sobrecarga', {
+      tooltip: { trigger: 'item', formatter: p => { const r = S[p.dataIndex];
+        return `<b>${esc(r.nombre)}</b><br>Carga máxima: ${fmt(r.max)}<br>Carga proyectada: ${fmt(r.proy)}<br>Sobrecarga: <b>${fmt(r.pct)}%</b>`; } },
+      grid: rejilla({ top: 8, right: 50 }), xAxis: ejeNum({ axisLabel: { formatter: '{value}%', fontSize: 10 } }),
+      yAxis: ejeCat(S.map(r => corto(r.nombre)), { axisLabel: { fontSize: 9, width: 260, overflow: 'truncate' } }),
+      series: [{ type: 'bar', barWidth: '64%', data: S.map(r => ({ value: +r.pct.toFixed(1), itemStyle: { color: r.pct >= 100 ? '#c62828' : r.pct >= 50 ? '#ef6c00' : '#fbc02d' } })),
+        label: { show: true, position: 'right', fontSize: 10, formatter: p => fmt(p.value) + '%' } }],
+    });
+  }
+
+  // ================= 4) Audiencias =================
+  function pintarAudiencias() {
+    const A = T.Audiencias_NCPP || [], B = T.Audiencias_SNEJ || [];
+    const anios = unicos([...A, ...B].map(r => r['AÑO'])).sort();
+    const parcial = new Set(A.filter(r => N(r['TIPO_AÑO']).startsWith('PARC')).map(r => r['AÑO']));
+    const selAnio = $('au-anio');
+    if (selAnio && !selAnio.options.length) {
+      const completos = anios.filter(a => !parcial.has(a));
+      selAnio.innerHTML = anios.map(a => `<option value="${a}">${a}${parcial.has(a) ? ' (parcial)' : ''}</option>`).join('');
+      selAnio.value = completos[completos.length - 1] ?? anios[anios.length - 1];
+      selAnio.onchange = () => { pintados.au = false; pintarAudiencias(); };
+    }
+    const anio = +selAnio?.value;
+    const etiqueta = a => parcial.has(a) ? a + '*' : String(a);
+    bloque('ncpp', A, 'SEDE', 'ATENDIDAS', 'Atendidas');
+    bloque('snej', B, 'JUZGADO', 'REALIZADAS', 'Realizadas');
+
+    function bloque(pre, rows, clave, campoAt, nombreAt) {
+      const ks = unicos(rows.map(r => r[clave]));
+      const s = (k, a, c) => rows.filter(r => r[clave] === k && (a == null || r['AÑO'] === a)).reduce((t, r) => t + num(r[c]), 0);
+      const hay = (k, a) => rows.some(r => r[clave] === k && r['AÑO'] === a);
+      ks.sort((x, y) => s(y, null, 'PROGRAMADAS') - s(x, null, 'PROGRAMADAS'));
+      const ys = anios.filter(a => rows.some(r => r['AÑO'] === a));
+      const lin = { type: 'line', symbolSize: 5, connectNulls: false };
+      grafico(`c-${pre}-prog`, {
+        color: PALETA, tooltip: { trigger: 'axis', valueFormatter: fmt }, legend: leyenda(), grid: rejilla({ top: 58 }),
+        xAxis: ejeCat(ys.map(etiqueta)), yAxis: ejeNum(),
+        series: ks.map(k => Object.assign({ name: k, data: ys.map(a => hay(k, a) ? s(k, a, 'PROGRAMADAS') : null) }, lin)),
+      });
+      grafico(`c-${pre}-tasa`, {
+        color: PALETA, tooltip: { trigger: 'axis', valueFormatter: v => v == null ? '–' : fmt(v) + '%' }, legend: leyenda(), grid: rejilla({ top: 58 }),
+        xAxis: ejeCat(ys.map(etiqueta)), yAxis: ejeNum({ scale: true, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } }),
+        series: ks.map(k => Object.assign({ name: k, data: ys.map(a => { const p = s(k, a, 'PROGRAMADAS'); return hay(k, a) && p ? +(s(k, a, campoAt) / p * 100).toFixed(1) : null; }) }, lin)),
+      });
+      grafico(`c-${pre}-acum`, {
+        tooltip: { trigger: 'axis', valueFormatter: fmt }, legend: leyenda(), grid: rejilla(),
+        xAxis: ejeCat(ks, { axisLabel: { fontSize: 10, interval: 0, rotate: ks.length > 7 ? 30 : 0 } }), yAxis: ejeNum(),
+        series: [['Programadas', 'PROGRAMADAS', COLOR.programadas], [nombreAt, campoAt, COLOR.atendidas], ['Suspendidas', 'SUSPENDIDAS', COLOR.suspendidas]]
+          .map(([n, c, col]) => ({ name: n, type: 'bar', color: col, data: ks.map(k => s(k, null, c)) })),
+      });
+      const filas = ks.filter(k => hay(k, anio)).map(k => ({ k, v: s(k, anio, 'PROGRAMADAS') ? s(k, anio, campoAt) / s(k, anio, 'PROGRAMADAS') * 100 : 0 }))
+        .sort((a, b) => a.v - b.v);
+      grafico(`c-${pre}-anio`, {
+        tooltip: { trigger: 'axis', valueFormatter: v => fmt(v) + '%' }, grid: rejilla({ top: 8, right: 50 }),
+        xAxis: ejeNum({ scale: true, max: 100, axisLabel: { formatter: '{value}%', fontSize: 10 } }), yAxis: ejeCat(filas.map(f => f.k)),
+        series: [{ type: 'bar', barWidth: '62%', data: filas.map((f, i) => ({ value: +f.v.toFixed(1), itemStyle: { color: PALETA[i % PALETA.length] } })),
+          label: { show: true, position: 'right', fontSize: 10, formatter: p => fmt(p.value) + '%' } }],
+      });
+      const t = $(`t-${pre}-anio`);
+      if (t) t.textContent = anio + (parcial.has(anio) ? ' (parcial)' : '');
+    }
+  }
+
+  // ================= 5) Personal jurisdiccional =================
+  const REGIMENES = [
+    { n: 'D.L. 728', cols: ['DL_728'], c: '#1565c0' },
+    { n: 'D.L. 1057 (CAS)', cols: ['CAS', 'RECAS'], c: '#f9a825' },
+    { n: 'Ley 29277', cols: ['LEY_29277'], c: '#2e7d32' },
+    { n: 'D.L. 276', cols: ['DL_276'], c: '#e53935' },
+  ];
+  function pintarPersonal() {
+    const P = T.Personal || [];
+    const deReg = (r, g) => g.cols.reduce((s, c) => s + num(r[c]), 0);
+    const tot = g => P.reduce((s, r) => s + deReg(r, g), 0);
+    const total = REGIMENES.reduce((s, g) => s + tot(g), 0);
+    const e = $('k-personal'); if (e) e.textContent = fmt(total);
+    const cards = $('pe-cards');
+    if (cards) cards.innerHTML = REGIMENES.map(g => `<div class="reg"><div class="reg-h" style="background:${g.c}">${esc(g.n)}</div>
+      <div class="reg-v">${fmt(tot(g))}</div><div class="reg-p">${total ? fmt(tot(g) / total * 100) : 0}% del personal</div></div>`).join('');
+    grafico('c-pe-dona', {
+      tooltip: { trigger: 'item', valueFormatter: fmt }, legend: leyenda({ orient: 'vertical', right: 0, top: 'middle' }),
+      series: [dona(REGIMENES.map(g => ({ name: g.n, value: tot(g), itemStyle: { color: g.c } })), { center: ['40%', '52%'], radius: ['45%', '72%'] })],
+    });
+    const top = P.map(r => ({ cargo: r.CARGO, t: REGIMENES.reduce((s, g) => s + deReg(r, g), 0), r }))
+      .sort((a, b) => b.t - a.t).slice(0, 15).reverse();
+    grafico('c-pe-cargos', {
+      tooltip: { trigger: 'axis', valueFormatter: fmt }, legend: leyenda(), grid: rejilla({ right: 30 }),
+      xAxis: ejeNum(), yAxis: ejeCat(top.map(x => x.cargo), { axisLabel: { fontSize: 9, width: 220, overflow: 'truncate' } }),
+      series: REGIMENES.map(g => ({ name: g.n, type: 'bar', stack: 'c', color: g.c, data: top.map(x => deReg(x.r, g) || null) })),
+    });
+    const cuerpo = $('t-pe'), buscar = $('t-pe-buscar');
+    if (cuerpo) {
+      const q = N(buscar?.value);
+      cuerpo.innerHTML = P.filter(r => !q || N(r.CARGO).includes(q))
+        .map(r => ({ r, t: REGIMENES.reduce((s, g) => s + deReg(r, g), 0) })).sort((a, b) => b.t - a.t)
+        .map(({ r, t }) => `<tr><td>${esc(r.CARGO)}</td>${REGIMENES.map(g => `<td class="n">${deReg(r, g) || ''}</td>`).join('')}<td class="n"><b>${t}</b></td></tr>`).join('');
+      if (buscar && !buscar.dataset.listo) { buscar.dataset.listo = 1; buscar.oninput = () => pintarPersonal(); }
+    }
+  }
+
+  const PINTORES = { pob: pintarPoblacion, res: pintarResumen, cp: pintarCarga, au: pintarAudiencias, pe: pintarPersonal };
+
+  function mostrar(tab) {
+    tabActual = tab;
+    if (!T || !Object.keys(T).length) return;
+    if (!pintados[tab]) { PINTORES[tab]?.(); pintados[tab] = true; }
+    requestAnimationFrame(() => Object.values(charts).forEach(c => c.resize()));
+  }
+
+  let espera = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(espera);
+    espera = setTimeout(() => Object.values(charts).forEach(c => c.resize()), 120);
+  });
+
+  window.Dash = {
+    iniciar({ tablas, alClicProvincia: f }) {
+      T = tablas || {};
+      alClicProvincia = f;
+      kpis();
+      if (tabActual) mostrar(tabActual);
+    },
+    // zona elegida en el mapa (o null): filtra tarjetas y la pestaña de resumen
+    filtrar(gid, nombre) {
+      sel = gid || null;
+      kpis(nombre);
+      pintados.res = false;
+      if (tabActual === 'res') mostrar('res');
+    },
+    mostrar,
+    COLOR,
+  };
+})();

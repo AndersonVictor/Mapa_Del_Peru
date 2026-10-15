@@ -13,7 +13,7 @@ ROOT = Path(__file__).parent
 PORT = 8000
 EXCEL = ROOT / "datos.xlsx"
 LISTA = ROOT / "lista_trabajo.xlsx"  # zonas del mapa de trabajo (/trabajo)
-JUECES = ROOT / "jueces.xlsx"        # modelo del Power BI: hojas Provincias, Data_Plana, DimDependencia
+JUECES = ROOT / "dashboard.xlsx"     # dashboard CSJ Junín: Magistrados, Organos, Poblacion, Carga_Procesal...
 TILE_DIR = ROOT / "cache_tiles"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/155.0.0.0 Safari/537.36"
 SITE = "https://censos2025.inei.gob.pe"
@@ -283,17 +283,19 @@ def jueces_json():
         clave = (JUECES.stat().st_mtime if JUECES.exists() else None, _excel["mtime"])
         if clave != _jueces["clave"]:
             if clave[0] is None:
-                res = {"provincias": {}, "sedes": [], "csjj": {}, "avisos": ["Falta jueces.xlsx junto a server.py."]}
+                res = {"provincias": {}, "sedes": [], "csjj": {}, "avisos": ["Falta dashboard.xlsx junto a server.py."]}
             else:
                 import jueces
                 res = jueces.resumen(JUECES, _excel["datos"], json.loads(extensiones()))
-                print(f"jueces.xlsx cargado: {len(res['provincias'])} provincias, {len(res['sedes'])} sedes")
+                print(f"dashboard.xlsx cargado: {res['csjj'].get('total', 0)} magistrados, {len(res['sedes'])} sedes")
             _jueces.update(clave=clave, json=json.dumps(res, ensure_ascii=False).encode())
         return _jueces["json"]
 
 
 ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
              "/vendor/maplibre-gl.css": "text/css",
+             "/vendor/echarts.min.js": "application/javascript",
+             "/graficos.js": "application/javascript; charset=utf-8",
              "/filtro.js": "application/javascript; charset=utf-8",
              "/tooltip.js": "application/javascript; charset=utf-8"}
 
@@ -301,7 +303,7 @@ ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
 def pagina(nombre):
     """HTML con ?v=<fecha> en filtro.js y tooltip.js: si cambian, el navegador baja la versión nueva."""
     html = (ROOT / nombre).read_text(encoding="utf-8")
-    for js in ("filtro.js", "tooltip.js"):
+    for js in ("filtro.js", "tooltip.js", "graficos.js"):
         html = html.replace(f'src="/{js}"', f'src="/{js}?v={int((ROOT / js).stat().st_mtime)}"')
     return html.encode("utf-8")
 

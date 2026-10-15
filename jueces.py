@@ -1,19 +1,18 @@
-"""Jueces y juezas por provincia y por sede (distrito), desde jueces.xlsx (modelo del Power BI).
+"""Datos del dashboard de la CSJ Junín, desde dashboard.xlsx (tablas planas, una fila por registro).
 
-- Hoja 'Provincias'      -> totales por provincia (los mismos que usa la medida RESUMEN del Power BI).
-- Hoja 'Data_Plana'      -> un magistrado por fila, con su SEDE_LOCALIDAD: se cuenta por distrito.
-- Hoja 'DimDependencia'  -> coordenadas de cada órgano: ubican la burbuja de cada sede en el mapa.
+- Magistrados -> un juez o jueza por fila: tarjetas, gráficos del resumen y burbujas por sede.
+- Organos     -> un órgano jurisdiccional por fila (tarjeta de órganos).
+- El resto de hojas (Poblacion, Carga_Procesal, Audiencias_*, Personal...) se envían tal cual y
+  el navegador hace las sumas, así los totales salen siempre de la misma fuente.
 
-Los nombres se cruzan con datos.xlsx (INEI) sin importar tildes ni Ñ.
+Los nombres de provincia y distrito se cruzan con datos.xlsx (INEI) sin importar tildes ni Ñ.
 """
+import datetime
 import re
 import unicodedata
 from collections import defaultdict
 
 CAMPOS = ["total", "varones", "mujeres", "titulares", "prov", "supern", "sala", "jesp", "jpl"]
-# encabezado de la hoja Provincias (normalizado) -> campo
-COL_PROV = {"TOTAL": "total", "VARONES": "varones", "MUJERES": "mujeres", "TITULARES": "titulares",
-            "SUPERN": "supern", "PROV": "prov", "SALA": "sala", "J ESP": "jesp", "JPL": "jpl"}
 
 
 def norm(s):
@@ -23,31 +22,33 @@ def norm(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
-def num(v):
-    try:
-        return int(float(v))
-    except (TypeError, ValueError):
-        return 0  # como COALESCE(..., 0)
+def limpio(v):
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, float) and v.is_integer():
+        return int(v)
+    if isinstance(v, (datetime.date, datetime.datetime)):
+        return v.isoformat()
+    return v
 
 
-def tabla(ws, primera_col):
-    """Filas de una hoja como dicts. El encabezado es la primera fila cuya primera celda es `primera_col`
-    (algunas hojas tienen un título arriba)."""
-    filas = ws.iter_rows(values_only=True)
-    for f in filas:
-        if norm(f[0]) == primera_col:
-            cab = [norm(c) for c in f]
-            break
-    else:
-        return []
-    return [dict(zip(cab, f)) for f in filas if any(v is not None for v in f)]
+def leer_hojas(ruta):
+    """{hoja: [ {COLUMNA: valor}, ... ]}. Encabezado en la fila 1; se saltan filas vacías."""
+    from openpyxl import load_workbook
+    wb = load_workbook(ruta, read_only=True, data_only=True)
+    out = {}
+    for ws in wb.worksheets:
+        filas = ws.iter_rows(values_only=True)
+        cab = [str(c).strip() if c is not None else "" for c in next(filas, [])]
+        out[ws.title] = [{c: limpio(v) for c, v in zip(cab, f) if c}
+                         for f in filas if any(v not in (None, "") for v in f)]
+    return out
 
 
 class Buscador:
     """Nombre (+ departamento/provincia) -> id_geografia de datos.xlsx. Estricto: si no calza, None."""
 
     def __init__(self, datos):
-        self.datos = datos
         self.por_nivel = defaultdict(list)
         for gid, d in datos.items():
             campo = {"7": "nombregion", "8": "nombprov", "9": "nombdist"}.get(gid[0])
@@ -65,80 +66,57 @@ class Buscador:
         return parecido[0] if len(parecido) == 1 else None
 
 
+def sumar(destino, m):
+    sexo, cond, inst = norm(m.get("SEXO")), norm(m.get("CONDICION")), norm(m.get("INSTANCIA"))
+    destino["total"] += 1
+    destino["varones"] += sexo.startswith("VAR")
+    destino["mujeres"] += sexo.startswith("MUJ")
+    destino["titulares"] += cond.startswith("T")
+    destino["prov"] += cond.startswith("P")
+    destino["supern"] += cond.startswith("S")
+    destino["sala"] += inst == "SALA"
+    destino["jesp"] += inst.startswith("J ESP")
+    destino["jpl"] += inst == "JPL"
+
+
 def resumen(ruta, datos, cajas):
-    """{'provincias': {id: {...}}, 'sedes': [ {...} ], 'csjj': {...}, 'avisos': [...]}"""
-    from openpyxl import load_workbook
-    wb = load_workbook(ruta, read_only=True, data_only=True)
-    hojas = {norm(n): n for n in wb.sheetnames}
+    """{'tablas': {hoja: filas}, 'provincias': {id: {...}}, 'sedes': [...], 'csjj': {...}, 'avisos': [...]}"""
+    tablas = leer_hojas(ruta)
     buscar = Buscador(datos)
     avisos = []
+    vacio = lambda **k: dict({c: 0 for c in CAMPOS}, **k)
 
-    # 1) Provincias: totales oficiales del resumen
-    provincias, dep_de_prov = {}, {}
-    for f in tabla(wb[hojas["PROVINCIAS"]], "UBIGEO") if "PROVINCIAS" in hojas else []:
-        if not f.get("PROVINCIA"):
-            continue
-        dep_de_prov[norm(f["PROVINCIA"])] = f.get("DEPARTAMENTO")
-        gid = buscar("8", f["PROVINCIA"], f.get("DEPARTAMENTO"))
-        if not gid:
-            avisos.append(f"Provincia '{f['PROVINCIA']}' ({f.get('DEPARTAMENTO')}) no se encontró en datos.xlsx.")
-            continue
-        p = {campo: num(f.get(col)) for col, campo in COL_PROV.items()}
-        p.update(nombre=f["PROVINCIA"], departamento=f.get("DEPARTAMENTO") or "")
-        provincias[gid] = p
-    csjj = {c: sum(p[c] for p in provincias.values()) for c in CAMPOS}
-
-    # 2) Coordenadas de los órganos. Solo valen las que caen dentro de su distrito:
-    #    hay errores de tipeo (ej. -7517.975 en vez de -75.17975) que mandaban la burbuja a otro lado.
-    coords, malas = defaultdict(list), defaultdict(int)
-    for f in tabla(wb[hojas["DIMDEPENDENCIA"]], "ID DEP") if "DIMDEPENDENCIA" in hojas else []:
-        gid = buscar("9", f.get("DISTRITO"), f.get("DEPARTAMENTO"), f.get("PROVINCIA"))
-        lat, lon = f.get("LATITUD DECIMAL"), f.get("LONGITUD DECIMAL")
-        if not gid or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
-            continue
-        c = cajas.get(gid)
-        if c and c[0] - 0.01 <= lon <= c[2] + 0.01 and c[1] - 0.01 <= lat <= c[3] + 0.01:
-            coords[gid].append((lon, lat))
+    # Cada magistrado: id de su provincia y de su distrito (sede) en el mapa
+    provincias, sedes, sin_ubicar = {}, {}, defaultdict(int)
+    for m in tablas.get("Magistrados", []):
+        dep, prov, sede = m.get("DEPARTAMENTO"), m.get("PROVINCIA"), m.get("SEDE_DISTRITO")
+        pid = buscar("8", prov, dep)
+        did = buscar("9", sede, dep, prov)
+        m["prov_id"], m["dist_id"] = pid, did
+        if pid:
+            sumar(provincias.setdefault(pid, vacio(nombre=prov, departamento=dep or "")), m)
         else:
-            malas[f"{f.get('DISTRITO')} ({f.get('PROVINCIA')})"] += 1
-
-    # 3) Data_Plana: cada magistrado suma en el distrito de su sede
-    sedes, sin_ubicar, por_prov = {}, defaultdict(int), defaultdict(int)
-    for f in tabla(wb[hojas["DATA PLANA"]], "PROVINCIA") if "DATA PLANA" in hojas else []:
-        prov, sede = f.get("PROVINCIA"), f.get("SEDE LOCALIDAD")
-        if not prov or norm(prov).startswith("TOTAL"):
-            continue
-        por_prov[norm(prov)] += 1
-        gid = buscar("9", sede, dep_de_prov.get(norm(prov)), prov)
-        if not gid:
+            avisos.append(f"Magistrados: provincia '{prov}' ({dep}) no se encontró en datos.xlsx.")
+        if did:
+            sumar(sedes.setdefault(did, vacio(nombre=sede, provincia=prov, departamento=dep or "", id=did)), m)
+        else:
             sin_ubicar[f"{sede} ({prov})"] += 1
-            continue
-        s = sedes.setdefault(gid, dict({c: 0 for c in CAMPOS}, nombre=sede, provincia=prov,
-                                       departamento=dep_de_prov.get(norm(prov)) or "", id=gid))
-        s["total"] += 1
-        sexo, cond, tipo = norm(f.get("SEXO")), norm(f.get("CONDICION LABEL") or f.get("CONDICION")), norm(f.get("TIPO ORGANO"))
-        s["varones"] += sexo.startswith("VAR")
-        s["mujeres"] += sexo.startswith("MUJ")
-        s["titulares"] += cond.startswith("T")
-        s["prov"] += cond.startswith("P")
-        s["supern"] += cond.startswith("S")
-        s["sala"] += tipo == "SALA"
-        s["jesp"] += tipo.startswith("J ESP")
-        s["jpl"] += tipo == "JPL"
-    for gid, s in sedes.items():
-        pts, c = coords.get(gid), cajas.get(gid)
-        if pts:  # la mediana: un dato raro no la mueve
-            s["lon"] = sorted(p[0] for p in pts)[len(pts) // 2]
-            s["lat"] = sorted(p[1] for p in pts)[len(pts) // 2]
-        elif c:  # sin coordenadas buenas: al centro del distrito
-            s["lon"], s["lat"] = (c[4], c[5]) if len(c) >= 6 else ((c[0] + c[2]) / 2, (c[1] + c[3]) / 2)
-    for k, n in malas.items():
-        avisos.append(f"DimDependencia: {n} coordenada(s) de {k} caen fuera de su distrito (se ignoraron).")
-    for k, n in sin_ubicar.items():
-        avisos.append(f"Sede '{k}': {n} magistrado(s) sin distrito que coincida en datos.xlsx (no salen como burbuja).")
-    for gid, p in provincias.items():
-        n = por_prov.get(norm(p["nombre"]), 0)
-        if n != p["total"]:
-            avisos.append(f"{p['nombre']}: la hoja Provincias dice {p['total']} y Data_Plana lista {n}.")
+    csjj = vacio()
+    for m in tablas.get("Magistrados", []):
+        sumar(csjj, m)
 
-    return {"provincias": provincias, "sedes": list(sedes.values()), "csjj": csjj, "avisos": avisos}
+    # Órganos: provincia y distrito en el mapa (para filtrar la tarjeta de órganos)
+    for o in tablas.get("Organos", []):
+        o["prov_id"] = buscar("8", o.get("PROVINCIA"), o.get("DEPARTAMENTO"))
+        o["dist_id"] = buscar("9", o.get("DISTRITO"), o.get("DEPARTAMENTO"), o.get("PROVINCIA"))
+
+    # Burbujas: en el centro de su distrito (el mapa ya sabe dónde está cada distrito)
+    for did, s in sedes.items():
+        c = cajas.get(did)
+        if c:
+            s["lon"], s["lat"] = (c[4], c[5]) if len(c) >= 6 else ((c[0] + c[2]) / 2, (c[1] + c[3]) / 2)
+
+    for k, n in sin_ubicar.items():
+        avisos.append(f"Magistrados: sede '{k}' no coincide con un distrito de datos.xlsx ({n} juez/jueza sin burbuja).")
+
+    return {"tablas": tablas, "provincias": provincias, "sedes": list(sedes.values()), "csjj": csjj, "avisos": avisos}

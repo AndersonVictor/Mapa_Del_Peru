@@ -46,18 +46,23 @@ Muestra solo las zonas de `lista_trabajo.xlsx` (columnas `NOMBRE`, `NIVEL`, `DEP
   - Para agregar una zona, agrega su fila; para quitarla, bórrala o pon `OCULTAR = SI`.
 - Edita la lista, guarda y recarga la página (F5).
 
-### Modo ⚖️ Jueces (botón arriba del panel)
+### Dashboard de la CSJ Junín (5 pestañas) — datos en `dashboard.xlsx`
 
-Lee `jueces.xlsx` (el modelo del Power BI de la CSJ Junín):
+`http://localhost:8000/trabajo` es un dashboard con gráficos ECharts (`vendor/echarts.min.js`, funciona sin internet):
 
-- **Provincias**: color según el total de jueces de la hoja `Provincias` (los mismos números de la medida RESUMEN).
-- **Burbujas por sede (distrito)**: se cuentan de la hoja `Data_Plana` (columna `SEDE_LOCALIDAD`) y se ubican
-  con las coordenadas de `DimDependencia`. Tamaño = cantidad de jueces.
-- Tooltip con el mismo orden que el RESUMEN: total, varones/mujeres, por condición y por instancia
-  (se personaliza en `tooltip.js`, función `tooltipJuecesHTML`).
-- En el panel: resumen de la CSJJ, ranking por provincia (clic = acercar) y **avisos** si las hojas no cuadran
-  entre sí o si una sede no se encuentra en el mapa.
-- Reemplaza `jueces.xlsx` por tu versión nueva (mismas hojas y columnas) y recarga la página.
+1. **Proyecciones poblacionales**: población proyectada por provincia, población del año elegido,
+   jueces por 100 mil habitantes (con el total de la Corte y la referencia nacional) y varones/mujeres por provincia.
+2. **Resumen y detalle por provincia**: el mapa con los combos. Al elegir una zona (combo, clic en el mapa o en una
+   barra) las tarjetas, las donas de género y condición, las barras por instancia y la tabla de jueces muestran
+   solo esa zona. "✕ Ver toda la Corte" quita el filtro.
+3. **Carga procesal**: carga/ingresos/resueltos por año, resueltos por especialidad, carga acumulada (%),
+   ingresos, tasa de resolución y órganos con sobrecarga.
+4. **Audiencias**: NCPP por sede y SNEJ por juzgado (programadas, tasa de atención, acumulado y tasa del año elegido).
+5. **Personal jurisdiccional**: total, régimen laboral, cargos con más personal y tabla de todos los cargos.
+
+`dashboard.xlsx` tiene una hoja por tema, todas planas (una fila por registro, sin títulos ni totales; el dashboard
+suma solo). Su hoja `LEEME` explica cada hoja. Edita, guarda y recarga la página (F5).
+Los colores de los gráficos están al inicio de `graficos.js` (`COLOR`).
 
 ## Editar los textos del tooltip (datos.xlsx)
 
