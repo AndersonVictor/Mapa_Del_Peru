@@ -1,6 +1,7 @@
 // Combos Departamento -> Provincia -> Distrito, compartidos por el mapa general y el de trabajo.
 // Los nombres salen de datos.xlsx (/api/datos) y la extensión de cada zona de /api/extensiones.
 (function () {
+  const COLOR_COMBO = '#0056a1'; // color del combo elegido y de la opción marcada
   const N = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
   const CAMPO = { 7: 'nombregion', 8: 'nombprov', 9: 'nombdist' };
   const CAPA = { 7: 'tb_region', 8: 'tb_provincia', 9: 'tb_distrito' };
@@ -39,18 +40,35 @@
     .etq.dep { font-size: 13px; font-weight: 800; color: #374151; }
     .etq.prov { font-size: 12px; }
     .etq.dest { color: #0b63ce; font-size: 13px; font-weight: 800; }
-    /* combos: etiqueta arriba; en azul cuando tienen algo elegido */
-    .combo { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+    /* combos (estilo INEI): botón + lista desplegable con círculos de selección.
+       COLOR_COMBO es el color de lo elegido: cámbialo aquí. */
+    .combo { --c: ${COLOR_COMBO}; position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
     .combo > span { font: 600 10.5px system-ui, sans-serif; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
-    .combo select { appearance: none; -webkit-appearance: none; width: 100%; font: 600 12.5px system-ui, sans-serif;
-      padding: 8px 30px 8px 12px; border: 1px solid #d9dde5; border-radius: 10px; color: #1f2937; cursor: pointer;
-      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 14px;
-      transition: background-color .15s, border-color .15s, color .15s; }
-    .combo select:hover:not(:disabled) { border-color: #0056a1; }
-    .combo select:disabled { opacity: .5; cursor: default; }
-    .combo.elegido select { background-color: #0056a1; border-color: #0056a1; color: #fff;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
-    .combo.elegido select option { background: #fff; color: #1f2937; }`;
+    .combo select { display: none; }
+    .combo-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;
+      font: 700 12.5px system-ui, sans-serif; padding: 9px 12px; border: 1px solid #d9dde5; border-radius: 10px;
+      background: #fff; color: #1f2937; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
+    .combo-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .combo-btn svg { width: 14px; height: 14px; flex: none; transition: transform .15s; }
+    .combo-btn:hover:not(:disabled) { border-color: var(--c); }
+    .combo-btn:disabled { opacity: .5; cursor: default; }
+    .combo.elegido .combo-btn { background: var(--c); border-color: var(--c); color: #fff; }
+    .combo.abierto .combo-btn svg { transform: rotate(180deg); }
+    .combo-menu { position: absolute; top: calc(100% + 6px); left: 0; min-width: 100%; width: max-content; max-width: 300px; z-index: 40;
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 32px rgba(16,24,40,.16);
+      overflow: hidden; display: none; }
+    .combo.abierto .combo-menu { display: block; }
+    .combo-menu .tit { font: 700 10.5px system-ui, sans-serif; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em;
+      padding: 10px 12px 6px; border-bottom: 1px solid #f1f2f5; }
+    .combo-menu .ops { max-height: 290px; overflow-y: auto; padding: 4px 0; }
+    .combo-op { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 0; background: none;
+      font: 600 12.5px system-ui, sans-serif; color: #1f2937; text-align: left; cursor: pointer; transition: background-color .12s; }
+    .combo-op:hover, .combo-op:focus-visible { background: #f3f6fa; outline: none; }
+    .combo-op .radio { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--c); flex: none;
+      display: flex; align-items: center; justify-content: center; }
+    .combo-op.sel { background: var(--c); color: #fff; font-weight: 800; }
+    .combo-op.sel .radio { border-color: #fff; }
+    .combo-op.sel .radio::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; }`;
   document.head.appendChild(css);
 
   function crearEtiquetas(map) {
@@ -114,22 +132,57 @@
     };
 
     contenedor.innerHTML = '';
+    // Cada combo: un <select> oculto que guarda el valor (y dispara 'change'), un botón y una lista
+    const flecha = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>';
+    const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const combo = (titulo, texto) => {
-      const caja = document.createElement('label');
+      const caja = document.createElement('div');
       caja.className = 'combo';
-      caja.innerHTML = `<span>${titulo}</span>`;
+      caja.innerHTML = `<span>${titulo}</span><button type="button" class="combo-btn" aria-haspopup="listbox"><span></span>${flecha}</button>
+        <div class="combo-menu" role="listbox"><div class="tit">Seleccionar</div><div class="ops"></div></div>`;
       const s = document.createElement('select');
       caja.appendChild(s);
       contenedor.appendChild(caja);
+      const btn = caja.querySelector('.combo-btn'), ops = caja.querySelector('.ops');
+      s.refrescar = () => {
+        btn.firstChild.textContent = s.options[s.selectedIndex]?.text || texto;
+        btn.disabled = s.disabled;
+        caja.classList.toggle('elegido', !!s.value);
+      };
       s.llenar = (lista) => {
         s.replaceChildren(new Option(texto, ''), ...lista.map(g => new Option(nombre(datos, g), g)));
         s.disabled = !lista.length;
+        s.refrescar();
       };
+      const cerrar = () => caja.classList.remove('abierto');
+      btn.onclick = () => {
+        const abrir = !caja.classList.contains('abierto');
+        document.querySelectorAll('.combo.abierto').forEach(c => c.classList.remove('abierto'));
+        if (!abrir) return;
+        ops.innerHTML = [...s.options].map(o => `<button type="button" role="option" class="combo-op${o.value === s.value ? ' sel' : ''}" data-v="${esc(o.value)}">
+          <span class="radio"></span><span>${esc(o.text)}</span></button>`).join('');
+        caja.classList.add('abierto');
+        (ops.querySelector('.sel') || ops.firstElementChild)?.scrollIntoView({ block: 'nearest' });
+      };
+      ops.onclick = e => {
+        const op = e.target.closest('.combo-op');
+        if (!op) return;
+        cerrar();
+        if (op.dataset.v === s.value) return;
+        s.value = op.dataset.v;
+        s.dispatchEvent(new Event('change'));
+      };
+      caja.addEventListener('keydown', e => { if (e.key === 'Escape') { cerrar(); btn.focus(); } });
       return s;
     };
+    // un clic fuera cierra cualquier lista abierta
+    if (!window.__combosCierre) {
+      window.__combosCierre = true;
+      document.addEventListener('click', e => { if (!e.target.closest('.combo')) document.querySelectorAll('.combo.abierto').forEach(c => c.classList.remove('abierto')); });
+    }
     const sDep = combo('Departamento', 'Todos'), sProv = combo('Provincia', 'Todas'), sDist = combo('Distrito', 'Todos');
-    // azul en los combos que tienen algo elegido
-    const pintar = () => [sDep, sProv, sDist].forEach(s => s.parentNode.classList.toggle('elegido', !!s.value));
+    // texto del botón y color de "elegido" según el valor de cada combo
+    const pintar = () => [sDep, sProv, sDist].forEach(s => s.refrescar());
     sDep.llenar(deps); sProv.llenar([]); sDist.llenar([]);
 
     const elegir = () => {
