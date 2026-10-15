@@ -38,7 +38,19 @@
       text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff; }
     .etq.dep { font-size: 13px; font-weight: 800; color: #374151; }
     .etq.prov { font-size: 12px; }
-    .etq.dest { color: #0b63ce; font-size: 13px; font-weight: 800; }`;
+    .etq.dest { color: #0b63ce; font-size: 13px; font-weight: 800; }
+    /* combos: etiqueta arriba; en azul cuando tienen algo elegido */
+    .combo { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+    .combo > span { font: 600 10.5px system-ui, sans-serif; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+    .combo select { appearance: none; -webkit-appearance: none; width: 100%; font: 600 12.5px system-ui, sans-serif;
+      padding: 8px 30px 8px 12px; border: 1px solid #d9dde5; border-radius: 10px; color: #1f2937; cursor: pointer;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center / 14px;
+      transition: background-color .15s, border-color .15s, color .15s; }
+    .combo select:hover:not(:disabled) { border-color: #0056a1; }
+    .combo select:disabled { opacity: .5; cursor: default; }
+    .combo.elegido select { background-color: #0056a1; border-color: #0056a1; color: #fff;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+    .combo.elegido select option { background: #fff; color: #1f2937; }`;
   document.head.appendChild(css);
 
   function crearEtiquetas(map) {
@@ -102,23 +114,29 @@
     };
 
     contenedor.innerHTML = '';
-    const combo = (texto) => {
+    const combo = (titulo, texto) => {
+      const caja = document.createElement('label');
+      caja.className = 'combo';
+      caja.innerHTML = `<span>${titulo}</span>`;
       const s = document.createElement('select');
-      s.setAttribute('aria-label', texto);
-      contenedor.appendChild(s);
+      caja.appendChild(s);
+      contenedor.appendChild(caja);
       s.llenar = (lista) => {
         s.replaceChildren(new Option(texto, ''), ...lista.map(g => new Option(nombre(datos, g), g)));
         s.disabled = !lista.length;
       };
       return s;
     };
-    const sDep = combo('Departamento (todos)'), sProv = combo('Provincia (todas)'), sDist = combo('Distrito (todos)');
+    const sDep = combo('Departamento', 'Todos'), sProv = combo('Provincia', 'Todas'), sDist = combo('Distrito', 'Todos');
+    // azul en los combos que tienen algo elegido
+    const pintar = () => [sDep, sProv, sDist].forEach(s => s.parentNode.classList.toggle('elegido', !!s.value));
     sDep.llenar(deps); sProv.llenar([]); sDist.llenar([]);
 
     const elegir = () => {
       const gid = sDist.value || sProv.value || sDep.value || null;
       marcar(map, gid);
       etiquetar();
+      pintar();
       alElegir?.(gid);
     };
     sDep.onchange = () => { sProv.llenar(sDep.value ? provDe(sDep.value) : []); sDist.llenar([]); elegir(); };
@@ -127,7 +145,7 @@
 
     etiquetar();
     return {
-      reiniciar() { sDep.value = ''; sProv.llenar([]); sDist.llenar([]); marcar(map, null); etiquetar(); },
+      reiniciar() { sDep.value = ''; sProv.llenar([]); sDist.llenar([]); marcar(map, null); etiquetar(); pintar(); },
       // Pone los combos en una zona (p. ej. al hacer clic en la lista del mapa de trabajo)
       ir(gid) {
         const dep = gid[0] === '7' ? gid : deps.find(r => (gid[0] === '8' ? provDe(r) : provDe(r).flatMap(distDe)).includes(gid));

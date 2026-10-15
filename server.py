@@ -296,6 +296,7 @@ ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
              "/vendor/maplibre-gl.css": "text/css",
              "/vendor/echarts.min.js": "application/javascript",
              "/graficos.js": "application/javascript; charset=utf-8",
+             "/iconos.svg": "image/svg+xml",
              "/filtro.js": "application/javascript; charset=utf-8",
              "/tooltip.js": "application/javascript; charset=utf-8"}
 
