@@ -85,21 +85,21 @@ function tooltipJuecesHTML(j, titulo, departamento, pie = '') {
   #tip { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: none; display: none; z-index: 5;
     min-width: ${e.ancho}; max-width: 330px; background: ${e.fondo}; color: ${e.texto}; border: 1px solid ${e.borde};
     border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 14px 16px;
-    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  #tip h4 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
-  #tip .amb { color: #9ca3af; font-size: 11.5px; margin-top: 1px; }
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #tip h4 { margin: 0; font-size: 20.5px; font-weight: 800; letter-spacing: -.01em; }
+  #tip .amb { color: #9ca3af; font-size: 12.5px; margin-top: 1px; }
   #tip .destacado { margin-top: 10px; background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.18);
     border-radius: 8px; padding: 7px 11px; }
-  #tip .destacado span { display: block; color: ${e.acento}; font-weight: 700; font-size: 12.5px; }
-  #tip .destacado b { display: block; color: ${e.acento}; font-size: 25px; font-weight: 800; line-height: 1.1; letter-spacing: .01em; }
+  #tip .destacado span { display: block; color: ${e.acento}; font-weight: 700; font-size: 13.5px; }
+  #tip .destacado b { display: block; color: ${e.acento}; font-size: 27px; font-weight: 800; line-height: 1.1; letter-spacing: .01em; }
   #tip .sep { border-top: 1px solid rgba(255,255,255,.12); margin: 10px 0 8px; }
-  #tip .sec { color: #9ca3af; font-size: 12px; font-weight: 700; letter-spacing: .02em; margin-bottom: 3px; }
-  #tip .row { display: flex; justify-content: space-between; gap: 14px; font-size: 13px; margin-top: 2px; }
+  #tip .sec { color: #9ca3af; font-size: 13px; font-weight: 700; letter-spacing: .02em; margin-bottom: 3px; }
+  #tip .row { display: flex; justify-content: space-between; gap: 14px; font-size: 14px; margin-top: 2px; }
   #tip .row span { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
   #tip .row b { font-weight: 800; white-space: nowrap; }
   #tip .punto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
-  #tip .dato span { display: block; color: #9ca3af; font-size: 12px; font-weight: 600; }
-  #tip .dato b { font-size: 14px; font-weight: 800; }
-  #tip .bajo { color: #9ca3af; font-size: 11.5px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 7px; }`;
+  #tip .dato span { display: block; color: #9ca3af; font-size: 13px; font-weight: 600; }
+  #tip .dato b { font-size: 15px; font-weight: 800; }
+  #tip .bajo { color: #9ca3af; font-size: 12.5px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 7px; }`;
   document.head.appendChild(css);
 })();
