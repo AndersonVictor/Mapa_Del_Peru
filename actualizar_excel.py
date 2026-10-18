@@ -5,13 +5,13 @@
 
 Los ids se sacan de los tiles del mapa (capa tb_distrito) y los datos de la API de tooltip del INEI.
 """
-import gzip, json, math, sys, time
+import gzip, json, math, sys, time, urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 
-from server import COLUMNAS, EXCEL, fetch_tile, fetch_tooltip
+from server import COLUMNAS, EXCEL, TILE_DIR, fetch_tile, fetch_tooltip
 
 ZOOM = 8
 BOUNDS = (-81.5, -18.5, -68.5, 0.2)  # lon/lat de Perú
@@ -158,12 +158,33 @@ def txt(v):
     return str(int(v)) if isinstance(v, float) and v.is_integer() else str(v)
 
 
+class SinConexion(Exception):
+    pass
+
+
+def tile_seguro(t):
+    """El tile desde cache_tiles/ o, si falta, del INEI con 3 reintentos (el INEI a veces corta la conexión)."""
+    for intento in range(3):
+        try:
+            return fetch_tile(*t)
+        except urllib.error.HTTPError as e:
+            if e.code < 500:
+                raise
+            err = e
+        except (urllib.error.URLError, OSError) as e:
+            err = e
+        time.sleep(2 * (intento + 1))
+    raise SinConexion(f"tile {t[0]}/{t[1]}/{t[2]}: {getattr(err, 'reason', err)}")
+
+
 def ids_geografia():
     ids = set()
     tiles = tiles_peru(ZOOM)
-    print(f"Leyendo {len(tiles)} tiles (zoom {ZOOM})...")
-    with ThreadPoolExecutor(8) as ex:
-        for pbf in ex.map(lambda t: fetch_tile(*t), tiles):
+    faltan_disco = sum(not (TILE_DIR / str(z) / str(x) / f"{y}.pbf").exists() for z, x, y in tiles)
+    print(f"Leyendo {len(tiles)} tiles (zoom {ZOOM})" +
+          (f"; {faltan_disco} no están en cache_tiles/ y se piden al INEI..." if faltan_disco else " desde cache_tiles/..."))
+    with ThreadPoolExecutor(4) as ex:
+        for pbf in ex.map(tile_seguro, tiles):
             for p in propiedades(pbf, "tb_distrito"):
                 if "id_geografia" not in p:
                     continue
@@ -228,4 +249,19 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SinConexion as e:
+        print(f"""
+No se pudo conectar con el INEI ({e}).
+
+Este script solo hace falta para bajar o completar datos.xlsx. Opciones:
+  1. Si ya tienes los datos en otra PC/carpeta, copia de allá a esta carpeta:
+       - la carpeta  cache_tiles\\
+       - el archivo  datos.xlsx
+     y no necesitas correr este script (ni descargar_todo.py).
+  2. Revisa tu internet y abre https://censos2025.inei.gob.pe en el navegador.
+     Si el navegador abre pero Python no, un antivirus o firewall puede estar bloqueando a Python.
+  3. Vuelve a intentar más tarde: el INEI a veces corta conexiones si recibe muchos pedidos.
+""")
+        sys.exit(1)
