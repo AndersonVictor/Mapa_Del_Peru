@@ -13,6 +13,7 @@ ROOT = Path(__file__).parent
 PORT = 8000
 EXCEL = ROOT / "datos.xlsx"
 LISTA = ROOT / "lista_trabajo.xlsx"  # zonas del mapa de trabajo (/trabajo)
+COMPETENCIAS = ROOT / "competencias.xlsx"  # competencia territorial de cada órgano: define qué se dibuja
 JUECES = ROOT / "dashboard.xlsx"     # dashboard CSJ Junín: Magistrados, Organos, Poblacion, Carga_Procesal...
 TILE_DIR = ROOT / "cache_tiles"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/155.0.0.0 Safari/537.36"
@@ -292,6 +293,52 @@ def jueces_json():
         return _jueces["json"]
 
 
+_terr = {"clave": None, "datos": None}
+_terr_lock = threading.Lock()
+
+
+def territorio_datos():
+    """Territorio de la Corte (territorio.py). Se recalcula si cambia competencias.xlsx o datos.xlsx."""
+    with _terr_lock:
+        excel_json()
+        clave = (COMPETENCIAS.stat().st_mtime if COMPETENCIAS.exists() else None, _excel["mtime"])
+        if clave != _terr["clave"]:
+            if clave[0] is None:
+                res = {"provincias": [], "distritos": [], "departamentos": [], "cobertura": {}, "nombres": {},
+                       "no_reconocido": ["Falta competencias.xlsx junto a server.py."]}
+            else:
+                import territorio
+                res = territorio.territorio(COMPETENCIAS, _excel["datos"])
+                print(f"competencias.xlsx: {len(res['provincias'])} provincias completas, "
+                      f"{len(res['distritos'])} distritos sueltos")
+            _terr.update(clave=clave, datos=res)
+        return _terr["datos"]
+
+
+def territorio_xlsx():
+    """El territorio de la Corte con los datos del censo de cada zona."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    t, datos = territorio_datos(), _excel["datos"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "territorio"
+    extras = list(dict.fromkeys(c for d in datos.values() for c in d if c not in COLUMNAS and c != "nivel"))
+    ws.append(["alcance", "organos_con_competencia"] + COLUMNAS + extras)
+    for gid in t["provincias"] + t["distritos"]:
+        d = datos.get(gid, {})
+        alcance = "Provincia completa" if gid[0] == "8" else "Distrito"
+        ws.append([alcance, len(t["cobertura"].get(gid, []))] + [d.get(c, gid if c == "id_geografia" else "") for c in COLUMNAS] +
+                  [d.get(c, "") for c in extras])
+    for c in ws[1]:
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor="7F1D2D")
+    ws.freeze_panes = "A2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 TIPOS_SRC = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml",
              ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon", ".css": "text/css",
              ".js": "application/javascript"}
@@ -349,6 +396,13 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, extensiones(), "application/json")
             if p.startswith("/api/jueces"):
                 return self.send(200, jueces_json(), "application/json; charset=utf-8", {"Cache-Control": "no-store"})
+            if p.startswith("/api/territorio.xlsx"):
+                return self.send(200, territorio_xlsx(),
+                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                 {"Content-Disposition": 'attachment; filename="territorio_csjj.xlsx"'})
+            if p.startswith("/api/territorio"):
+                return self.send(200, json.dumps(territorio_datos(), ensure_ascii=False).encode(),
+                                 "application/json; charset=utf-8", {"Cache-Control": "no-store"})
             if p.startswith("/api/lista.xlsx"):
                 return self.send(200, lista_xlsx(),
                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

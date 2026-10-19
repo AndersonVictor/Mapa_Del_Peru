@@ -46,6 +46,20 @@ Muestra solo las zonas de `lista_trabajo.xlsx` (columnas `NOMBRE`, `NIVEL`, `DEP
   - Para agregar una zona, agrega su fila; para quitarla, bórrala o pon `OCULTAR = SI`.
 - Edita la lista, guarda y recarga la página (F5).
 
+### Territorio del mapa: `competencias.xlsx`
+
+El mapa de trabajo dibuja solo el territorio que la Corte atiende, leído de la columna
+**"Competencia (Territorial)"** de `competencias.xlsx` (una fila por órgano jurisdiccional):
+
+- "PROVINCIA(S) DE A, B Y C" → esas provincias completas.
+- "DISTRITO(S) DE X, Y Y Z" → solo esos distritos (ej. Chinchihuasi, Paucarbamba y Pachamarca de Churcampa).
+- Entiende alias (La Oroya = Yauli, Pampas = Tayacaja, Cajas = San Agustín), aclaraciones como
+  "(PROVINCIA DE CHURCAMPA)" o "DE LA PROVINCIA DE TAYACAJA", y corrige errores de tipeo.
+- Un distrito con nombre repetido (Palca, Acobamba...) se busca primero en la provincia de la sede del órgano.
+- Lo que no reconozca aparece en "Revisar" del panel. Edita el Excel, guarda y recarga (F5).
+
+`lista_trabajo.xlsx` ya no define el mapa (lo reemplaza `competencias.xlsx`).
+
 ### Dashboard de la CSJ Junín (5 pestañas) — datos en `dashboard.xlsx`
 
 `http://localhost:8000/trabajo` es un dashboard con gráficos ECharts (`vendor/echarts.min.js`, funciona sin internet):
