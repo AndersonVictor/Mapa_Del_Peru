@@ -52,7 +52,12 @@ def main():
         print(f"  {fallos} tiles fallaron: vuelve a correr el script para reintentarlos.")
 
     print("2/2 Textos del tooltip -> datos.xlsx")
-    actualizar_excel.main()
+    try:
+        actualizar_excel.main()
+    except actualizar_excel.SinConexion as e:
+        print(f"  No se pudo conectar con el INEI ({e}). Vuelve a correr el script más tarde:")
+        print("  lo ya descargado no se vuelve a pedir.")
+        sys.exit(1)
     print("Listo. Ahora:  python server.py  (ya no consulta al INEI)")
 
 
