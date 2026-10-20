@@ -124,10 +124,16 @@
     const m = (T.Magistrados || []).filter(enSel), o = (T.Organos || []).filter(enSel);
     const set = (id, v) => { const e = $(id); if (e) e.textContent = typeof v === 'number' ? fmt(v) : v; };
     set('k-total', m.length); set('k-organos', o.length);
-    set('k-var', m.filter(esVaron).length); set('k-muj', m.filter(esMujer).length);
-    set('k-tit', m.filter(r => cond(r) === 'T').length);
-    set('k-sup', m.filter(r => cond(r) === 'S').length);
-    set('k-prov', m.filter(r => cond(r) === 'P').length);
+    // cada tarjeta: número, % del total y barra
+    const parte = (id, n) => {
+      const p = m.length ? n / m.length * 100 : 0;
+      set('k-' + id, n); set('k-' + id + '-p', fmt(p) + '%');
+      const bar = $('k-' + id + '-bar'); if (bar) bar.style.width = p + '%';
+    };
+    parte('var', m.filter(esVaron).length); parte('muj', m.filter(esMujer).length);
+    parte('tit', m.filter(r => cond(r) === 'T').length);
+    parte('sup', m.filter(r => cond(r) === 'S').length);
+    parte('prov', m.filter(r => cond(r) === 'P').length);
     const f = $('filtro-activo');
     if (f) { f.hidden = !sel; set('k-sel', nombreSel || ''); }
   }

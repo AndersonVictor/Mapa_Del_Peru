@@ -50,26 +50,40 @@
 
   /* --- pestañas --- */
   .tabs { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid var(--borde);
-    display: flex; gap: 4px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+    display: flex; gap: 10px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
   .tabs button { font: inherit; font-size: 15px; font-weight: 600; color: var(--suave); background: none; border: 0;
     border-bottom: 3px solid transparent; padding: 13px 12px 11px; cursor: pointer; display: inline-flex; align-items: center;
     gap: 7px; white-space: nowrap; transition: color .15s, border-color .15s; }
   .tabs button:hover { color: var(--texto); }
+  .tabs button:first-child { margin-left: auto; } .tabs button:last-child { margin-right: auto; } /* centrado sin cortar */
   .tabs button.on { color: var(--granate); border-bottom-color: var(--granate); }
 
   /* --- tarjetas de indicadores --- */
-  .kpis { display: grid; grid-template-columns: 1.25fr repeat(5, 1fr); gap: 14px; padding: 18px 20px 4px; }
-  .kpi { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 16px; padding: 14px 16px;
-    display: flex; align-items: center; gap: 14px; box-shadow: var(--sombra); min-width: 0; }
-  .kpi .chip { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; flex: none; }
-  .kpi .chip .ic { width: 24px; height: 24px; }
-  .kpi b { font-size: 30px; font-weight: 800; line-height: 1; display: block; letter-spacing: -.02em; }
-  .kpi span { font-size: 13.5px; color: var(--suave); font-weight: 600; }
-  .kpi.total { background: var(--granate); color: #fff; border: 0; }
-  .kpi.total .chip { background: rgba(255,255,255,.15); color: #fff; }
-  .kpi.total span { color: #f6dfe3; }
-  .kpi.total b { font-size: 36.5px; }
-  .kpi small { display: block; color: #f6dfe3; font-size: 12.5px; margin-top: 3px; }
+  .kpis { display: grid; grid-template-columns: 1.2fr repeat(5, 1fr); gap: 16px; padding: 20px 20px 6px; }
+  .kpi { --c: var(--granate); --t: #f6e8ea; position: relative; overflow: hidden; background: var(--tarjeta);
+    border: 1px solid var(--borde); border-top: 4px solid var(--c); border-radius: 16px; padding: 16px 18px 14px;
+    min-height: 132px; display: flex; flex-direction: column; box-shadow: var(--sombra);
+    transition: transform .18s ease, box-shadow .18s ease; }
+  .kpi:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(16,24,40,.10); }
+  .kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .kpi-lbl { font-size: 13px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .05em; }
+  .kpi .chip { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none;
+    background: var(--t); color: var(--c); }
+  .kpi .chip .ic { width: 22px; height: 22px; }
+  .kpi b { font-size: 36px; font-weight: 800; line-height: 1; letter-spacing: -.02em; margin: 10px 0 10px; color: var(--texto); }
+  .kpi-bar { height: 6px; border-radius: 99px; background: var(--t); overflow: hidden; }
+  .kpi-bar i { display: block; height: 100%; width: 0; background: var(--c); border-radius: 99px; transition: width .6s ease; }
+  .kpi small { font-size: 12.5px; color: var(--tenue); margin-top: 6px; font-weight: 500; }
+  .kpi small span { color: var(--c); font-weight: 800; }
+  .kpi-fondo { position: absolute; right: -14px; bottom: -16px; width: 92px; height: 92px; color: var(--c); opacity: .07;
+    pointer-events: none; }
+  .kpi.total { background: var(--granate); border: 0; border-top: 4px solid #5e1220; color: #fff; }
+  .kpi.total .kpi-lbl { color: #f6dfe3; }
+  .kpi.total .chip { background: rgba(255,255,255,.16); color: #fff; }
+  .kpi.total b { color: #fff; font-size: 44px; }
+  .kpi.total small { color: #f6dfe3; font-size: 13px; margin-top: auto; }
+  .kpi.total small span { color: #fff; }
+  .kpi.total .kpi-fondo { color: #fff; opacity: .1; width: 110px; height: 110px; }
   .activo { margin: 12px 20px 0; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--azul);
     background: #e8f1fa; border: 1px solid #cfe1f3; border-radius: 999px; padding: 6px 8px 6px 12px; }
   .activo .ic { width: 15px; height: 15px; }
@@ -180,6 +194,9 @@
     #pob-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 1200px) {
+    .tabs { flex-wrap: wrap; justify-content: center; gap: 2px 6px; }
+    .tabs button { padding: 11px 10px 9px; font-size: 14px; }
+    .tabs button:first-child, .tabs button:last-child { margin: 0; }
     .cab { flex-wrap: wrap; }
     .titulo-img { position: static; transform: none; order: 3; flex-basis: 100%; max-width: 100%; max-height: 60px; }
     .gestion { order: 2; }
@@ -198,8 +215,11 @@
       white-space: normal; text-align: left; line-height: 1.2; }
     .tabs button.on { background: var(--granate); color: #fff; border-color: var(--granate); }
     .tabs button:last-child:nth-child(odd) { grid-column: span 2; }
+    .tabs button:first-child, .tabs button:last-child { margin: 0; }
     .kpis { grid-template-columns: repeat(2, 1fr); padding: 14px 16px 0; gap: 10px; }
-    .kpi { padding: 12px; gap: 10px; } .kpi .chip { width: 38px; height: 38px; } .kpi b { font-size: 24px; } .kpi.total b { font-size: 28px; }
+    .kpi { padding: 12px 14px; min-height: 0; } .kpi .chip { width: 32px; height: 32px; border-radius: 10px; }
+    .kpi .chip .ic { width: 18px; height: 18px; } .kpi-lbl { font-size: 11px; }
+    .kpi b { font-size: 26px; margin: 8px 0; } .kpi.total b { font-size: 32px; } .kpi-fondo { width: 64px; height: 64px; }
     .kpi.total { grid-column: span 2; }
     main { padding: 12px 16px 24px; }
     .s3, .s4, .s5, .s6 { grid-column: span 12; }
@@ -239,18 +259,47 @@
 </nav>
 
 <section class="kpis">
-  <div class="kpi total"><div class="chip"><svg class="ic"><use href="/iconos.svg#mazo"/></svg></div>
-    <div><b id="k-total">–</b><span>Jueces y juezas</span><small><span id="k-organos">–</span> órganos jurisdiccionales</small></div></div>
-  <div class="kpi"><div class="chip" style="background:#e6eef7;color:#0056a1"><svg class="ic"><use href="/iconos.svg#hombre"/></svg></div>
-    <div><b id="k-var">–</b><span>Varones</span></div></div>
-  <div class="kpi"><div class="chip" style="background:#fde7f1;color:#e8559a"><svg class="ic"><use href="/iconos.svg#mujer"/></svg></div>
-    <div><b id="k-muj">–</b><span>Mujeres</span></div></div>
-  <div class="kpi"><div class="chip" style="background:#e7f6ec;color:#16a34a"><svg class="ic"><use href="/iconos.svg#titular"/></svg></div>
-    <div><b id="k-tit">–</b><span>Titulares</span></div></div>
-  <div class="kpi"><div class="chip" style="background:#fef3e2;color:#d97706"><svg class="ic"><use href="/iconos.svg#supernumerario"/></svg></div>
-    <div><b id="k-sup">–</b><span>Supernumerarios</span></div></div>
-  <div class="kpi"><div class="chip" style="background:#f0edfe;color:#7c5cf0"><svg class="ic"><use href="/iconos.svg#provisional"/></svg></div>
-    <div><b id="k-prov">–</b><span>Provisionales</span></div></div>
+  <div class="kpi total">
+    <div class="kpi-top"><span class="kpi-lbl">Jueces y juezas</span><div class="chip"><svg class="ic"><use href="/iconos.svg#mazo"/></svg></div></div>
+    <b id="k-total">–</b>
+    <small><span id="k-organos">–</span> órganos jurisdiccionales</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#escala"/></svg>
+  </div>
+  <div class="kpi" style="--c:#0056a1;--t:#e6eef7">
+    <div class="kpi-top"><span class="kpi-lbl">Varones</span><div class="chip"><svg class="ic"><use href="/iconos.svg#hombre"/></svg></div></div>
+    <b id="k-var">–</b>
+    <div class="kpi-bar"><i id="k-var-bar"></i></div>
+    <small><span id="k-var-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#hombre"/></svg>
+  </div>
+  <div class="kpi" style="--c:#e8559a;--t:#fde7f1">
+    <div class="kpi-top"><span class="kpi-lbl">Mujeres</span><div class="chip"><svg class="ic"><use href="/iconos.svg#mujer"/></svg></div></div>
+    <b id="k-muj">–</b>
+    <div class="kpi-bar"><i id="k-muj-bar"></i></div>
+    <small><span id="k-muj-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#mujer"/></svg>
+  </div>
+  <div class="kpi" style="--c:#16a34a;--t:#e7f6ec">
+    <div class="kpi-top"><span class="kpi-lbl">Titulares</span><div class="chip"><svg class="ic"><use href="/iconos.svg#titular"/></svg></div></div>
+    <b id="k-tit">–</b>
+    <div class="kpi-bar"><i id="k-tit-bar"></i></div>
+    <small><span id="k-tit-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#titular"/></svg>
+  </div>
+  <div class="kpi" style="--c:#d97706;--t:#fef3e2">
+    <div class="kpi-top"><span class="kpi-lbl">Supernumerarios</span><div class="chip"><svg class="ic"><use href="/iconos.svg#supernumerario"/></svg></div></div>
+    <b id="k-sup">–</b>
+    <div class="kpi-bar"><i id="k-sup-bar"></i></div>
+    <small><span id="k-sup-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#supernumerario"/></svg>
+  </div>
+  <div class="kpi" style="--c:#7c5cf0;--t:#f0edfe">
+    <div class="kpi-top"><span class="kpi-lbl">Provisionales</span><div class="chip"><svg class="ic"><use href="/iconos.svg#provisional"/></svg></div></div>
+    <b id="k-prov">–</b>
+    <div class="kpi-bar"><i id="k-prov-bar"></i></div>
+    <small><span id="k-prov-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#provisional"/></svg>
+  </div>
 </section>
 <div class="activo" id="filtro-activo" hidden><svg class="ic"><use href="/iconos.svg#pin"/></svg>Mostrando solo <b id="k-sel"></b>
   <button id="quitar"><svg class="ic"><use href="/iconos.svg#cerrar"/></svg>Ver toda la Corte</button></div>
