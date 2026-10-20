@@ -43,6 +43,10 @@
   .cab { position: relative; }
   .titulo-img { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-height: 78px; max-width: calc(100% - 860px);
     object-fit: contain; pointer-events: none; }
+  /* logo de la institución; el filtro engrosa los trazos finos de las imágenes blancas */
+  .cab-logo { flex: none; display: flex; align-items: center; }
+  .logo-img { display: block; height: 60px; width: auto; }
+  .titulo-img { filter: drop-shadow(0 0 .6px #fff) drop-shadow(0 0 .4px #fff); }
   /* presidente y gestión, en amarillo a la derecha */
   .gestion { margin-left: auto; text-align: right; color: #fcd34d; font-size: 14px; line-height: 1.45; white-space: nowrap; }
   .gestion b { font-weight: 700; }
@@ -226,10 +230,18 @@
     .gestion { order: 2; }
   }
   @media (max-width: 700px) {
-    .cab { padding: 12px 16px; gap: 10px 12px; flex-wrap: wrap; }
-    .titulo-img { position: static; transform: none; order: 3; flex-basis: 100%; max-width: 100%; max-height: 50px; }
-    .gestion { order: 4; flex-basis: 100%; margin-left: 0; text-align: left; font-size: 13px; white-space: normal; }
-    .cab > div:nth-child(2) { flex: 1; min-width: 0; }
+    /* celular: logo + título en una fila, presidente y gestión centrados debajo */
+    .cab { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 14px;
+      padding: 12px 16px 10px; min-height: 0; }
+    .cab-logo { grid-column: 1; grid-row: 1; order: 0; }
+    .logo-img { height: 54px; }
+    .titulo-img { grid-column: 2; grid-row: 1; order: 0; position: static; transform: none; width: 100%; max-width: 100%;
+      max-height: 58px; margin: 0 auto; filter: drop-shadow(0 0 .8px #fff) drop-shadow(0 0 .6px #fff); }
+    .gestion { grid-column: 1 / -1; grid-row: 2; order: 0; margin: 0; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.18);
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0 10px; text-align: center; font-size: 12.5px;
+      line-height: 1.4; white-space: normal; }
+    .gestion > div:first-child { flex-basis: 100%; }
+    .gestion .lema::before { content: "·"; margin-right: 10px; color: rgba(252,211,77,.6); font-style: normal; }
     .cab h1 { font-size: 16px; } .cab small { font-size: 12.5px; }
     .logo { width: 36px; height: 36px; border-radius: 10px; }
 
@@ -258,6 +270,9 @@
     input[type=search] { min-width: 0; width: 100%; }
     .gran-total b { font-size: 36.5px; }
   }
+  @media (max-width: 380px) {
+    .logo-img { height: 46px; } .titulo-img { max-height: 48px; } .gestion { font-size: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -269,8 +284,7 @@
   </div>
 </div>
 <header class="cab">
-  <div class="logo"><svg class="ic"><use href="/iconos.svg#escala"/></svg></div>
-  <div><h1>Corte Superior de Justicia de Junín</h1></div>
+  <div class="cab-logo"><img class="logo-img" src="src/img/logo.png" alt="Corte Superior de Justicia de Junín"></div>
   <img class="titulo-img" src="/src/img/titulo.png" alt="" onerror="this.remove()">
   <div class="gestion">
     <div><b>Presidente:</b> Dr. Ricardo Corrales Melgarejo</div>
@@ -402,6 +416,7 @@
       <div class="card s5"><h3>Órganos con sobrecarga <small>% sobre la carga máxima</small></h3><div class="ch" id="c-sobrecarga"></div></div>
     </div>
     <p class="nota">El último año puede ser parcial (datos hasta la fecha de corte).</p>
+    <p class="nota"> <b>Fuente:</b> Base de datos institucional | INEI</p>
   </section>
 
   <!-- 4) AUDIENCIAS -->
