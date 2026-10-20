@@ -116,6 +116,20 @@ def tile_local(z, x, y):
     return _tile_cache[key]
 
 
+def precargar_tiles():
+    """Lee todos los tiles de cache_tiles/ a memoria al arrancar: el mapa sale más rápido."""
+    n = 0
+    for f in TILE_DIR.rglob("*.pbf"):
+        try:
+            key = (int(f.parent.parent.name), int(f.parent.name), int(f.stem))
+        except ValueError:
+            continue
+        if key not in _tile_cache:
+            _tile_cache[key] = f.read_bytes()
+            n += 1
+    print(f"Tiles en memoria: {n}")
+
+
 def zoom_maximo():
     zs = [int(d.name) for d in TILE_DIR.iterdir() if d.name.isdigit()] if TILE_DIR.exists() else []
     return max(zs, default=0)
@@ -452,6 +466,7 @@ if __name__ == "__main__":
                   "correr  python descargar_todo.py")
     if TILE_DIR.exists():  # deja calculadas las extensiones mientras abres el navegador
         threading.Thread(target=extensiones, daemon=True).start()
+        threading.Thread(target=precargar_tiles, daemon=True).start()
     print(f"Mapa general:   http://localhost:{PORT}")
     print(f"Mapa de trabajo: http://localhost:{PORT}/trabajo")
     ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
