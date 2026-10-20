@@ -125,6 +125,7 @@
     max-width: min(520px, calc(100% - 32px)); background: #fff7e6; color: #7a4b00; border: 1px solid #f3d38b;
     border-radius: 10px; padding: 10px 14px; font-size: 14.5px; line-height: 1.5; }
   .leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--suave); margin-top: 10px; }
+  .leyenda .sin-comp { background: #e3e6eb repeating-linear-gradient(135deg, rgba(100,116,139,.45) 0 1.5px, transparent 1.5px 5px); }
   .leyenda span { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; }
   details { margin-top: 10px; font-size: 13.5px; border-top: 1px solid var(--borde); padding-top: 10px; }
   summary { cursor: pointer; color: var(--texto); font-weight: 600; display: flex; align-items: center; gap: 7px; list-style: none; }
@@ -283,6 +284,7 @@
         <div class="leyenda" id="ley-poblacion" hidden>
           <div><span style="background:#fcd34d"></span>Provincia con competencia (completa)</div>
           <div><span style="background:#a78bfa"></span>Distrito con competencia</div>
+          <div><span class="sin-comp"></span>Sin competencia territorial</div>
         </div>
         <details><summary><svg class="ic"><use href="/iconos.svg#lista"/></svg>Territorio de la Corte (competencias.xlsx)</summary>
           <div id="lista"></div>
@@ -394,7 +396,9 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-ri
 let J = {}, modo = 'jueces';
 let datos = {}, regIds = new Set(), provIds = new Set(), distIds = new Set(), filtro = null;
 const fullRegs = new Set(), hidProv = new Set(), hidDist = new Set();
-// ¿Se dibuja esta zona? (departamento TODO, o en la lista, y no marcada con OCULTAR)
+// ¿Está en Junín / Huancavelica? (se dibuja; si no tiene competencia, en gris rayado)
+const enDeps = g => [...regIds].some(r => r.slice(1, 3) === g.slice(1, 3));
+// ¿Tiene competencia territorial? (provincia completa o distrito nombrado en competencias.xlsx)
 function visible(g) {
   const dep = [...fullRegs].some(r => r.slice(1, 3) === g.slice(1, 3));
   if (g[0] === '7') return regIds.has(g);
@@ -468,6 +472,7 @@ map.on('load', async () => {
   const fullCod = [...fullRegs].map(g => +g.slice(1, 3));
   const provCod = [...provIds].map(g => +g.slice(1, 5));
   const depDe = ['%', ['floor', ['/', ID, 10000]], 100]; // id 7/8/9 + ccdd... -> ccdd
+  const enDepsF = ['in', REG, lit([...regIds].map(g => +g.slice(1, 3)))];   // todo Junín y Huancavelica
   const dentro = ['all',
     ['any', ['in', REG, lit(fullCod)], ['in', PROV, lit(provCod)], ['in', ID, lit(num(distIds))]],
     ['!', ['in', PROV, lit([...hidProv].map(g => +g.slice(1, 5)))]],
@@ -481,20 +486,26 @@ map.on('load', async () => {
   const line = (id, layer, filter, color, w) => map.addLayer({ id, type: 'line', source: 'inei',
     'source-layer': layer, filter, paint: { 'line-color': color, 'line-width': w } });
 
-  fill('f-area', 'tb_distrito', dentro, '#f4f1ea');
+  fill('f-area', 'tb_distrito', enDepsF, '#f4f1ea');
+  // Sin competencia territorial: gris con rayas diagonales
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const x = c.getContext('2d'); x.strokeStyle = 'rgba(100,116,139,.45)'; x.lineWidth = 1.5;
+  x.beginPath(); x.moveTo(-4, 20); x.lineTo(20, -4); x.moveTo(-4, 4); x.lineTo(4, -4); x.moveTo(12, 20); x.lineTo(20, 12); x.stroke();
+  map.addImage('rayas', x.getImageData(0, 0, 16, 16), { pixelRatio: 2 });
+  const sinComp = ['all', enDepsF, ['!', dentro]];
+  fill('f-sin', 'tb_distrito', sinComp, '#e3e6eb');
+  map.addLayer({ id: 'f-sin-rayas', type: 'fill', source: 'inei', 'source-layer': 'tb_distrito', filter: sinComp,
+    paint: { 'fill-pattern': 'rayas' } });
   fill('f-prov', 'tb_distrito', ['all', dentro, ['in', PROV, lit(provCod)]], '#fcd34d', 0.6);
   fill('f-dist', 'tb_distrito', ['all', dentro, ['in', ID, lit(num(distIds))]], '#a78bfa', 0.75);
   // Jueces: provincias coloreadas por total de magistrados (dashboard.xlsx, hoja Magistrados)
   const colores = ['match', PROV];
   for (const [gid, p] of Object.entries(J.provincias || {})) colores.push(+gid.slice(1, 5), colorJueces(p.total));
   fill('j-prov', 'tb_distrito', dentro, colores.length > 2 ? [...colores, '#f4f1ea'] : '#f4f1ea');
-  line('l-dist', 'tb_distrito', dentro, '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 6, 0.3, 10, 0.9]);
-  line('l-prov', 'tb_provincia', ['all', ['any', ['in', depDe, lit(fullCod)], ['in', ID, lit(num(provIds))]],
-    ['!', ['in', ID, lit(num(hidProv))]]], '#6b6458', ['interpolate', ['linear'], ['zoom'], 6, 0.9, 10, 1.8]);
-  // Borde del departamento solo si se ve completo; con zonas ocultas el borde lo dan las provincias visibles
-  const conExcepcion = new Set([...hidProv, ...hidDist].map(g => g.slice(1, 3)));
-  line('l-reg', 'tb_region', ['in', ID, lit(num([...fullRegs].filter(g => !conExcepcion.has(g.slice(1, 3)))))],
-    '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 6, 1.8, 10, 3]);
+  line('l-dist', 'tb_distrito', enDepsF, '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 6, 0.3, 10, 0.9]);
+  line('l-prov', 'tb_provincia', ['in', depDe, lit([...regIds].map(g => +g.slice(1, 3)))], '#6b6458',
+    ['interpolate', ['linear'], ['zoom'], 6, 0.9, 10, 1.8]);
+  line('l-reg', 'tb_region', ['in', ID, lit(num(regIds))], '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 6, 1.8, 10, 3]);
 
   const on = ['boolean', ['feature-state', 'hover'], false];
   for (const capa of ['tb_region', 'tb_provincia', 'tb_distrito']) {
@@ -521,7 +532,7 @@ map.on('load', async () => {
   const permitido = g => g[0] === '8'
     ? (visible(g) && provIds.has(g)) || [...distIds].some(x => visible(x) && x.slice(1, 5) === g.slice(1, 5))
     : visible(g) && (distIds.has(g) || provIds.has('8' + g.slice(1, 5) + '00'));
-  const iniciales = () => Object.keys(datos).filter(g => g[0] === '8' && visible(g))
+  const iniciales = () => Object.keys(datos).filter(g => g[0] === '8' && enDeps(g))
     .concat([...distIds].filter(g => visible(g) && !visible('8' + g.slice(1, 5) + '00')));
   const ext = await Filtro.extensiones();
   const cajaDe = ids => {
@@ -531,7 +542,8 @@ map.on('load', async () => {
   };
   const visiblesDe = dep => [...provIds, ...distIds].filter(g => g.slice(1, 3) === dep.slice(1, 3) && visible(g));
   filtro = Filtro.crear({ map, contenedor: document.getElementById('combos'), datos, area: regIds, permitido,
-    rotulable: visible, etiquetasIniciales: iniciales,
+    rotulable: enDeps, etiquetasIniciales: iniciales,
+    apagado: g => !visible(g) && !(g[0] === '8' && [...distIds].some(x => x.slice(1, 5) === g.slice(1, 5))),
     alElegir: gid => {
       marcarLista(gid);
       Dash.filtrar(gid, gid ? Filtro.nombre(datos, gid) : null);
@@ -545,7 +557,7 @@ map.on('load', async () => {
     document.getElementById('map-cargando').classList.add('listo');
     quitarCarga();
   });
-  const cajas = [...fullRegs, ...provIds, ...distIds].filter(visible).map(g => ext[g]).filter(Boolean);
+  const cajas = [...regIds].map(g => ext[g]).filter(Boolean);
   if (cajas.length) {
     AREA = [[Math.min(...cajas.map(c => c[0])), Math.min(...cajas.map(c => c[1]))],
             [Math.max(...cajas.map(c => c[2])), Math.max(...cajas.map(c => c[3]))]];
@@ -576,6 +588,7 @@ function pintarLeyendaJueces() {
   document.getElementById('ley-jueces').innerHTML =
     rangos.map(([a, b]) => `<div><span style="background:${colorJueces(a)}"></span>${a}${b ? '–' + b : '+'} jueces</div>`).join('') +
     `<div><span style="background:#f4f1ea;border:1px solid #ccc"></span>Sin jueces</div>` +
+    `<div><span class="sin-comp"></span>Sin competencia territorial</div>` +
     `<div><span style="background:#1f2937;border-radius:50%"></span>Sede (distrito)</div>`;
 }
 
@@ -589,6 +602,7 @@ function pickJueces(pt) {
   }
   const t = pick(pt);
   if (!t) return null;
+  if (t.sin) return { gid: t.dist, capa: 'tb_distrito', sin: true, html: tooltipSinCompetencia(t) };
   const prov = '8' + t.dist.slice(1, 5) + '00', p = J.provincias?.[prov], d = datos[prov] || {};
   const pie = p ? '' : '<div class="bajo">Sin jueces registrados en dashboard.xlsx</div>';
   return { gid: prov, capa: 'tb_provincia', html: tooltipJuecesHTML(p, esc(p?.nombre || d.nombprov || ''), esc(p?.departamento || d.nombregion || ''), pie) };
@@ -628,6 +642,14 @@ function setHighlight(capa, id) {
   hovered = capa ? { sourceLayer: capa, id } : null;
   if (hovered) map.setFeatureState({ source: 'inei', ...hovered }, { hover: true });
 }
+// Tooltip de un distrito sin competencia territorial de la Corte
+function tooltipSinCompetencia(t) {
+  const d = datos[t.dist] || {};
+  return `<h4>${esc(d.nombdist || '')}</h4><div class="amb">${esc(d.nombprov || '')} · ${esc(d.nombregion || '')}</div>
+    <div class="sep"></div><div class="sec">Sin competencia territorial</div>
+    <div style="color:#d1d5db;font-size:12.5px">La Corte Superior de Justicia de Junín no tiene competencia en este distrito
+    (según competencias.xlsx).</div>`;
+}
 function pick(pt) {
   if (!map.getLayer('f-area')) return null;
   const hit = map.queryRenderedFeatures(pt, { layers: ['f-area'] })[0];
@@ -636,6 +658,7 @@ function pick(pt) {
   const dist = String(p.id_geografia).split('.')[0];
   const prov = '8' + pad(p.ccdd) + pad(p.ccpp) + '00';
   const reg = '7' + pad(p.cod_region ?? p.ccdd) + '0000';
+  if (!visible(dist)) return { gid: dist, capa: 'tb_distrito', dist, prov, sin: true };
   const gid = distIds.has(dist) ? dist : provIds.has(prov) ? prov : reg;
   return { gid, capa: Filtro.CAPA[gid[0]], dist };
 }
@@ -668,6 +691,7 @@ function update(pt) {
   if (key !== current) {
     current = key;
     setHighlight(t.capa, +t.gid);
+    if (t.sin) { tip.innerHTML = tooltipSinCompetencia(t); tip.style.display = 'block'; return place(pt); }
     const d = datos[t.gid];
     const bajo = t.gid !== t.dist && datos[t.dist] ? `<div class="bajo">Distrito bajo el cursor: ${esc(datos[t.dist].nombdist)}</div>` : '';
     if (d) { tip.innerHTML = tooltipHTML(d, bajo); tip.style.display = 'block'; } else tip.style.display = 'none';
@@ -688,7 +712,7 @@ map.on('movestart', () => { if (!matchMedia('(hover: hover)').matches) clear(); 
 map.on('click', e => {
   const t = modo === 'jueces' ? pickJueces(e.point) : pick(e.point);
   schedule(e.point);
-  if (t) elegirZona(t.gid);
+  if (t && !t.sin) elegirZona(t.gid);
 });
 </script>
 </body>

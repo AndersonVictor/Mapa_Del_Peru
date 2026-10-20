@@ -56,6 +56,8 @@ El mapa de trabajo dibuja solo el territorio que la Corte atiende, leído de la 
 - Entiende alias (La Oroya = Yauli, Pampas = Tayacaja, Cajas = San Agustín), aclaraciones como
   "(PROVINCIA DE CHURCAMPA)" o "DE LA PROVINCIA DE TAYACAJA", y corrige errores de tipeo.
 - Un distrito con nombre repetido (Palca, Acobamba...) se busca primero en la provincia de la sede del órgano.
+- Junín y Huancavelica se dibujan completos: los distritos **sin competencia territorial** van en gris
+  rayado (con su nombre apagado y un aviso en el tooltip) y no se pueden filtrar.
 - Lo que no reconozca aparece en "Revisar" del panel. Edita el Excel, guarda y recarga (F5).
 
 `lista_trabajo.xlsx` ya no define el mapa (lo reemplaza `competencias.xlsx`).

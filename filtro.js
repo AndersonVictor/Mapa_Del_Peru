@@ -39,6 +39,7 @@
       text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 0 0 4px #fff; }
     .etq.dep { font-size: 13px; font-weight: 800; color: #374151; }
     .etq.prov { font-size: 12px; }
+    .etq.apagada { color: #9ca3af; font-weight: 500; }
     .etq.dest { color: #0b63ce; font-size: 13px; font-weight: 800; }
     /* combos (estilo INEI): botón + lista desplegable con círculos de selección.
        COLOR_COMBO es el color de lo elegido: cámbialo aquí. */
@@ -84,7 +85,7 @@
       }
     };
     map.on('moveend', acomodar);
-    return async (ids, nombreDe, destacado) => {
+    return async (ids, nombreDe, destacado, apagado = () => false) => {
       const mio = ++turno;
       const ext = await extensiones();
       if (mio !== turno) return; // llegó otro pedido mientras tanto
@@ -94,10 +95,12 @@
         // centro del polígono; si el servidor aún no lo calculó, el centro de la caja
         const punto = e.length >= 6 ? [e[4], e[5]] : [(e[0] + e[2]) / 2, (e[1] + e[3]) / 2];
         const el = document.createElement('div');
-        el.className = 'etq ' + ({ 7: 'dep', 8: 'prov', 9: 'dist' }[g[0]]) + (g === destacado ? ' dest' : '');
+        el.className = 'etq ' + ({ 7: 'dep', 8: 'prov', 9: 'dist' }[g[0]]) + (g === destacado ? ' dest' : apagado(g) ? ' apagada' : '');
         el.textContent = nombreDe(g);
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(punto).addTo(map);
-        return { el, marker, prioridad: g === destacado ? Infinity : e[6] ?? (e[2] - e[0]) * (e[3] - e[1]) };
+        // los nombres apagados (sin competencia) ceden su lugar a los demás
+        const base = e[6] ?? (e[2] - e[0]) * (e[3] - e[1]);
+        return { el, marker, prioridad: g === destacado ? Infinity : apagado(g) ? base / 1e6 : base };
       }).sort((a, b) => b.prioridad - a.prioridad);
       requestAnimationFrame(acomodar);
     };
@@ -107,7 +110,7 @@
   //             rotulable(gid): qué zonas pueden llevar nombre, etiquetasIniciales(): ids con nombre sin elegir nada,
   //             alElegir(gid|null) }
   function crear({ map, contenedor, datos, area = null, permitido = () => true, rotulable = () => true,
-                   etiquetasIniciales = null, alElegir }) {
+                   etiquetasIniciales = null, apagado = () => false, alElegir }) {
     const ids = Object.keys(datos);
     const orden = (a, b) => nombre(datos, a).localeCompare(nombre(datos, b), 'es');
     const deps = ids.filter(g => g[0] === '7' && (!area || area.has(g))).sort(orden);
@@ -128,7 +131,7 @@
                       ids.filter(g => g[0] === '9' && g.slice(1, 3) === sDep.value.slice(1, 3) && rotulable(g) &&
                                       !rotulable('8' + g.slice(1, 5) + '00')))
                   : etiquetasIniciales ? etiquetasIniciales() : deps;
-      ponerEtiquetas(lista, g => nombre(datos, g), sDist.value || null);
+      ponerEtiquetas(lista, g => nombre(datos, g), sDist.value || null, apagado);
     };
 
     contenedor.innerHTML = '';
