@@ -31,21 +31,6 @@ python server.py             # abre http://localhost:8000
 
 ## Mapa de trabajo: Junín y Huancavelica (http://localhost:8000/trabajo)
 
-Muestra solo las zonas de `lista_trabajo.xlsx` (columnas `NOMBRE`, `NIVEL`, `DEPARTAMENTO`, `PROVINCIA`):
-
-- El área del mapa son los departamentos que la lista tiene con `NIVEL = DEPARTAMENTO` (hoy Junín y Huancavelica).
-  Las filas de otros departamentos (Huancané, Pacasmayo, Urubamba) aparecen en el panel como *fuera del área*.
-- Amarillo = provincia de la lista, violeta = distrito de la lista. El tooltip muestra lo más específico de la lista bajo el cursor.
-- Clic en el mapa o en la lista del panel = acercarse a esa zona. Los combos solo ofrecen lo que está en la lista.
-- **Descargar Excel**: la lista con los datos de `datos.xlsx` (población, hombres, mujeres, densidad).
-- Los nombres se buscan en `datos.xlsx` sin importar tildes ni Ñ. Si alguno sale con ⚠ *no encontrado*, revisa cómo está escrito.
-- **Qué se dibuja** (columnas de `lista_trabajo.xlsx`, explicado también en su hoja `LEEME`):
-  - `MOSTRAR` en filas DEPARTAMENTO: `TODO` = completo (Junín); `SOLO LISTA` = solo sus provincias/distritos de la
-    lista (Huancavelica: Acobamba, Churcampa, Tayacaja y Palca).
-  - `OCULTAR = SI` en una fila PROVINCIA o DISTRITO = excepción: esa zona no se dibuja.
-  - Para agregar una zona, agrega su fila; para quitarla, bórrala o pon `OCULTAR = SI`.
-- Edita la lista, guarda y recarga la página (F5).
-
 ### Territorio del mapa: `competencias.xlsx`
 
 El mapa de trabajo dibuja solo el territorio que la Corte atiende, leído de la columna
@@ -59,8 +44,6 @@ El mapa de trabajo dibuja solo el territorio que la Corte atiende, leído de la 
 - Junín y Huancavelica se dibujan completos: los distritos **sin competencia territorial** van en gris
   rayado (con su nombre apagado y un aviso en el tooltip) y no se pueden filtrar.
 - Lo que no reconozca aparece en "Revisar" del panel. Edita el Excel, guarda y recarga (F5).
-
-`lista_trabajo.xlsx` ya no define el mapa (lo reemplaza `competencias.xlsx`).
 
 ### Dashboard de la CSJ Junín (5 pestañas) — datos en `dashboard.xlsx`
 

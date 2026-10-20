@@ -5,14 +5,13 @@ Antes, una sola vez, descarga todo con:  python descargar_todo.py
 Las funciones de descarga (token, fetch_tile, fetch_tooltip) solo las usan los scripts
 descargar_todo.py y actualizar_excel.py.
 """
-import io, json, math, re, threading, time, unicodedata, urllib.parse, urllib.request, urllib.error
+import io, json, math, re, threading, time, urllib.parse, urllib.request, urllib.error
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 PORT = 8000
 EXCEL = ROOT / "datos.xlsx"
-LISTA = ROOT / "lista_trabajo.xlsx"  # zonas del mapa de trabajo (/trabajo)
 COMPETENCIAS = ROOT / "competencias.xlsx"  # competencia territorial de cada órgano: define qué se dibuja
 JUECES = ROOT / "dashboard.xlsx"     # dashboard CSJ Junín: Magistrados, Organos, Poblacion, Carga_Procesal...
 TILE_DIR = ROOT / "cache_tiles"
@@ -199,94 +198,6 @@ def extensiones():
         return _ext["json"]
 
 
-# --- Lista de trabajo (lista_trabajo.xlsx): nombres -> id_geografia usando datos.xlsx ---
-NIVELES = {"DEPARTAMENTO": "7", "PROVINCIA": "8", "DISTRITO": "9"}
-CAMPO_NOMBRE = {"7": "nombregion", "8": "nombprov", "9": "nombdist"}
-
-
-def norm(s):
-    """'Junín ' -> 'JUNIN'; Ñ -> N; sin tildes ni espacios dobles."""
-    s = unicodedata.normalize("NFD", str(s or "")).upper()
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    s = re.sub(r"\s+", " ", s).strip()
-    return re.sub(r"^(DEPARTAMENTO|PROVINCIA|DISTRITO) (DE )?", "", s)
-
-
-def leer_lista():
-    if not LISTA.exists():
-        return []
-    from openpyxl import load_workbook
-    ws = load_workbook(LISTA, read_only=True, data_only=True).worksheets[0]
-    filas = ws.iter_rows(values_only=True)
-    cab = [norm(c) for c in next(filas, [])]
-    out = []
-    for fila in filas:
-        d = dict(zip(cab, fila))
-        if d.get("NOMBRE"):
-            out.append({k: str(d.get(k.upper()) or "").strip()
-                        for k in ("nombre", "nivel", "departamento", "provincia", "mostrar", "ocultar")})
-    return out
-
-
-def buscar(fila, datos):
-    """id_geografia de una fila de la lista, o None. Filtra por nombre, luego departamento y provincia."""
-    nivel = NIVELES.get(norm(fila["nivel"]))
-    if not nivel:
-        return None
-    campo = CAMPO_NOMBRE[nivel]
-    cand = [g for g, d in datos.items() if g[0] == nivel and norm(d.get(campo)) == norm(fila["nombre"])]
-    for col, campo in (("departamento", "nombregion"), ("provincia", "nombprov")):
-        if fila[col]:
-            mejor = [g for g in cand if norm(datos[g].get(campo)) == norm(fila[col])]
-            if mejor:
-                cand = mejor
-    return cand[0] if cand else None
-
-
-def lista_json():
-    excel_json()  # relee datos.xlsx si cambió
-    datos = _excel["datos"]
-    filas = leer_lista()
-    for f in filas:
-        f["id"] = buscar(f, datos)
-    # El área del mapa = los departamentos que la lista tiene como DEPARTAMENTO
-    area = {norm(f["nombre"]) for f in filas if norm(f["nivel"]) == "DEPARTAMENTO"}
-    for f in filas:
-        f["en_area"] = norm(f["departamento"] or f["nombre"]) in area
-        f["ocultar"] = norm(f["ocultar"]) in ("SI", "S", "X", "1", "OCULTAR")
-        # departamento: TODO (se ve completo) o SOLO LISTA (solo sus provincias/distritos de la lista)
-        f["mostrar"] = "SOLO LISTA" if "SOLO" in norm(f["mostrar"]) else "TODO"
-    return filas
-
-
-def lista_xlsx():
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    filas = lista_json()
-    datos = _excel["datos"]
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "lista"
-    # columnas que agregaste a datos.xlsx también salen en la descarga
-    extras = list(dict.fromkeys(c for d in datos.values() for c in d if c not in COLUMNAS and c != "nivel"))
-    ws.append(["nombre", "nivel", "departamento", "provincia"] + COLUMNAS + extras)
-    for f in filas:
-        if not f["en_area"] or f["ocultar"]:
-            continue
-        d = datos.get(f["id"] or "", {})
-        ws.append([f["nombre"], f["nivel"], f["departamento"], f["provincia"]] +
-                  [d.get(c, "") if c != "id_geografia" else (f["id"] or "NO ENCONTRADO") for c in COLUMNAS] +
-                  [d.get(c, "") for c in extras])
-    for c in ws[1]:
-        c.font = Font(bold=True, color="FFFFFF")
-        c.fill = PatternFill("solid", fgColor="C8102E")
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
-    buf = io.BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
-
-
 _jueces = {"clave": None, "json": b"{}"}
 _jueces_lock = threading.Lock()
 
@@ -416,13 +327,6 @@ class H(BaseHTTPRequestHandler):
                                  {"Content-Disposition": 'attachment; filename="territorio_csjj.xlsx"'})
             if p.startswith("/api/territorio"):
                 return self.send(200, json.dumps(territorio_datos(), ensure_ascii=False).encode(),
-                                 "application/json; charset=utf-8", {"Cache-Control": "no-store"})
-            if p.startswith("/api/lista.xlsx"):
-                return self.send(200, lista_xlsx(),
-                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                 {"Content-Disposition": 'attachment; filename="lista_trabajo_datos.xlsx"'})
-            if p.startswith("/api/lista"):
-                return self.send(200, json.dumps(lista_json(), ensure_ascii=False).encode(),
                                  "application/json; charset=utf-8", {"Cache-Control": "no-store"})
             if p.rstrip("/") in ("/trabajo", "/trabajo.html"):
                 return self.send(200, pagina("trabajo.html"), "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
