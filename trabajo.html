@@ -133,6 +133,30 @@
     color: var(--suave); border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; }
   .modo button .ic { width: 14px; height: 14px; }
   .modo button.on { background: #fff; color: var(--granate); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  /* --- mapa en pantalla completa: ocupa toda la pantalla y muestra el panel de resumen --- */
+  #card-mapa.completa { position: fixed; inset: 0; z-index: 90; border-radius: 0; border: 0; margin: 0;
+    display: flex; flex-direction: column; padding: 14px 20px 10px; }
+  #card-mapa.completa #mapwrap { flex: 1; height: auto; min-height: 0; }
+  #card-mapa.completa details { display: none; }
+  #map-info { display: none; }
+  #card-mapa.completa #map-info { display: block; position: absolute; top: 14px; left: 14px; z-index: 6; width: 300px;
+    max-height: calc(100% - 28px); overflow-y: auto; background: rgba(255,255,255,.97); border: 1px solid var(--borde);
+    border-radius: 16px; box-shadow: 0 10px 30px rgba(16,24,40,.14); padding: 16px 18px; }
+  #map-info .mi-k { font-size: 11.5px; font-weight: 700; color: var(--tenue); text-transform: uppercase; letter-spacing: .06em; }
+  #map-info h4 { margin: 2px 0 10px; font-size: 19px; font-weight: 800; color: var(--texto); }
+  #map-info .mi-total { background: var(--granate); color: #fff; border-radius: 12px; padding: 10px 14px; display: flex;
+    align-items: baseline; gap: 8px; }
+  #map-info .mi-total b { font-size: 32px; font-weight: 800; line-height: 1; }
+  #map-info .mi-total span { font-size: 13px; color: #f6dfe3; }
+  #map-info .mi-sec { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--borde); }
+  #map-info .mi-sec > div:first-child { font-size: 11.5px; font-weight: 700; color: var(--tenue); text-transform: uppercase;
+    letter-spacing: .05em; margin-bottom: 4px; }
+  #map-info .mi-f { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13.5px; padding: 2px 0; }
+  #map-info .mi-f span { display: inline-flex; align-items: center; gap: 8px; color: #374151; }
+  #map-info .mi-f i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  #map-info .mi-f b { font-weight: 800; }
+  #map-info .mi-f small { color: var(--tenue); font-weight: 600; margin-left: 4px; }
+  #map-info .mi-nota { font-size: 12px; color: var(--suave); margin-top: 10px; }
   #mapwrap { position: relative; height: 540px; border-radius: 12px; overflow: hidden; background: #eef1f5; }
   #map { position: absolute; inset: 0; }
   #aviso { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 9; display: none;
@@ -224,6 +248,10 @@
     main { padding: 12px 16px 24px; }
     .s3, .s4, .s5, .s6 { grid-column: span 12; }
     .sub2 { grid-template-columns: 1fr; }
+    #completa span { display: none; }
+    #card-mapa.completa { padding: 10px 12px 6px; }
+    #card-mapa.completa .leyenda { display: none !important; }
+    #card-mapa.completa #map-info { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 42%; padding: 12px 14px; }
     ul { columns: 1; }
     #mapwrap { height: 420px; }
     #pob-mini { grid-template-columns: 1fr; }
@@ -321,14 +349,16 @@
   <!-- 2) RESUMEN Y DETALLE POR PROVINCIA -->
   <section class="tab" id="tab-res" hidden>
     <div class="g">
-      <div class="card s7">
+      <div class="card s7" id="card-mapa">
         <h3>Jueces y juezas en el territorio
           <span class="modo"><button data-modo="jueces"><svg class="ic"><use href="/iconos.svg#escala"/></svg>Jueces</button><button data-modo="poblacion"><svg class="ic"><use href="/iconos.svg#personas"/></svg>Población</button></span></h3>
         <div class="barra-mapa">
           <div id="combos"></div>
           <button class="btn" id="todo"><svg class="ic"><use href="/iconos.svg#refrescar"/></svg>Ver todo</button>
+          <button class="btn" id="completa" title="Ver el mapa en pantalla completa"><svg class="ic"><use href="/iconos.svg#expandir"/></svg><span>Pantalla completa</span></button>
         </div>
-        <div id="mapwrap"><div id="map-cargando"><div class="giro"></div></div><div id="map"></div><div id="tip"></div><div id="aviso"></div></div>
+        <div id="mapwrap"><div id="map-cargando"><div class="giro"></div></div><div id="map"></div>
+          <aside id="map-info" aria-live="polite"></aside><div id="tip"></div><div id="aviso"></div></div>
         <div class="leyenda" id="ley-jueces"></div>
         <div class="leyenda" id="ley-poblacion" hidden>
           <div><span style="background:#fcd34d"></span>Provincia con competencia (completa)</div>
@@ -342,7 +372,7 @@
         <details id="avisos-box" hidden><summary class="aviso-t"><svg class="ic"><use href="/iconos.svg#alerta"/></svg>Revisar en dashboard.xlsx (<span id="avisos-n"></span>)</summary><div class="avisos" id="avisos"></div></details>
       </div>
       <div class="s5" style="min-width:0">
-        <div class="card"><h3>Jueces y juezas por provincia <small>clic en una barra para filtrar</small></h3><div class="ch" id="c-prov-sexo"></div></div>
+        <div class="card"><h3>Jueces y juezas por provincia</h3><div class="ch" id="c-prov-sexo"></div></div>
         <div class="sub2">
           <div class="card"><h3>Por sexo</h3><div class="ch bajo" id="c-genero"></div><div class="ley-dona" id="c-genero-ley"></div></div>
           <div class="card"><h3>Por instancia</h3><div class="ch" id="c-inst"></div></div>
@@ -458,9 +488,9 @@ function visible(g) {
 
 // Zona elegida (combos, clic en el mapa o en una barra) -> filtra tarjetas y gráficos
 function elegirZona(gid) {
-  if (!filtro?.ir(gid)) { Filtro.marcar(map, gid); marcarLista(gid); Filtro.acercar(map, gid); Dash.filtrar(gid, Filtro.nombre(datos, gid)); }
+  if (!filtro?.ir(gid)) { Filtro.marcar(map, gid); marcarLista(gid); Filtro.acercar(map, gid); filtrarTodo(gid, Filtro.nombre(datos, gid)); }
 }
-function verToda() { filtro?.reiniciar(); marcarLista(null); clear(); verTodo(); Dash.filtrar(null); }
+function verToda() { filtro?.reiniciar(); marcarLista(null); clear(); verTodo(); filtrarTodo(null); }
 document.getElementById('todo').onclick = verToda;
 document.getElementById('quitar').onclick = verToda;
 
@@ -471,6 +501,7 @@ const pTerritorio = fetch('/api/territorio').then(r => r.json()).catch(() => ({}
 Promise.all([pJueces, pDatos]).then(([j, d]) => {
   J = j; datos = d;
   Dash.iniciar({ tablas: J.tablas, alClicProvincia: gid => elegirZona(gid) });
+  pintarInfoMapa(zonaActual);
   listoDatos = true;
   requestAnimationFrame(() => requestAnimationFrame(quitarCarga));
 });
@@ -480,6 +511,74 @@ Promise.all([pJueces, pTerritorio]).then(([j, terr]) => {
   document.getElementById('avisos-box').hidden = !av.length;
   document.getElementById('avisos-n').textContent = av.length;
   document.getElementById('avisos').innerHTML = av.map(a => `<div>• ${esc(a)}</div>`).join('');
+});
+
+// Zona elegida -> tarjetas, gráficos y panel del mapa en pantalla completa
+function filtrarTodo(gid, nombre) { Dash.filtrar(gid, nombre); pintarInfoMapa(gid, nombre); }
+
+// --- Panel de resumen (se ve en pantalla completa) ---
+let zonaActual = null, nombreZona = null;
+function pintarInfoMapa(gid, nombre) {
+  zonaActual = gid || null; nombreZona = gid ? (nombre ?? nombreZona) : null;
+  const M = J.tablas?.Magistrados || [], O = J.tablas?.Organos || [], N = Filtro.N;
+  const en = r => !gid || (gid[0] === '7' ? String(r.prov_id || '').slice(1, 3) === gid.slice(1, 3)
+                         : gid[0] === '8' ? r.prov_id === gid : r.dist_id === gid);
+  const m = M.filter(en), o = O.filter(en), cuenta = f => m.filter(f).length;
+  const f1 = n => n.toLocaleString('en-US', { maximumFractionDigits: 1 }).replace(/,/g, ' ').replace('.', ',');
+  const pct = n => m.length ? ` <small>${f1(n / m.length * 100)}%</small>` : '';
+  const fila = (color, txt, n, conPct) => `<div class="mi-f"><span><i style="background:${color}"></i>${txt}</span><b>${f1(n)}${conPct ? pct(n) : ''}</b></div>`;
+  const inst = r => { const i = N(r.INSTANCIA); return i === 'SALA' || i === 'JPL' ? i : 'JESP'; };
+  // población: la zona elegida o la suma del territorio con competencia
+  const pobDe = g => +String(datos[g]?.dato ?? '').replace(/[^\d]/g, '') || 0;
+  const pob = gid ? pobDe(gid) : [...provIds, ...distIds].reduce((s, g) => s + pobDe(g), 0);
+  const nivel = gid ? { 7: 'Departamento', 8: 'Provincia', 9: 'Distrito' }[gid[0]] : 'Toda la Corte';
+  const titulo = gid ? (nombreZona || Filtro.nombre(datos, gid)) : 'Corte Superior de Justicia de Junín';
+  document.getElementById('map-info').innerHTML = `
+    <div class="mi-k">${nivel}</div><h4>${esc(titulo)}</h4>
+    <div class="mi-total"><b>${f1(m.length)}</b><span>jueces y juezas</span></div>
+    <div class="mi-sec"><div>Por sexo</div>
+      ${fila(Dash.COLOR.varon, 'Varones', cuenta(r => N(r.SEXO).startsWith('VAR')), true)}
+      ${fila(Dash.COLOR.mujer, 'Mujeres', cuenta(r => N(r.SEXO).startsWith('MUJ')), true)}</div>
+    <div class="mi-sec"><div>Por condición</div>
+      ${fila(Dash.COLOR.titular, 'Titulares', cuenta(r => N(r.CONDICION)[0] === 'T'), true)}
+      ${fila(Dash.COLOR.supern, 'Supernumerarios', cuenta(r => N(r.CONDICION)[0] === 'S'), true)}
+      ${fila(Dash.COLOR.provis, 'Provisionales', cuenta(r => N(r.CONDICION)[0] === 'P'), true)}</div>
+    <div class="mi-sec"><div>Por instancia</div>
+      ${fila(Dash.COLOR.sala, 'Salas', cuenta(r => inst(r) === 'SALA'))}
+      ${fila(Dash.COLOR.jesp, 'Juzgados especializados', cuenta(r => inst(r) === 'JESP'))}
+      ${fila(Dash.COLOR.jpl, 'Juzgados de paz letrado', cuenta(r => inst(r) === 'JPL'))}</div>
+    <div class="mi-sec"><div>Territorio</div>
+      ${fila('#7f1d2d', 'Órganos jurisdiccionales', o.length)}
+      ${pob ? fila('#94a3b8', gid ? 'Población' : 'Población con competencia', pob) : ''}
+      ${pob && m.length ? fila('#94a3b8', 'Jueces por 100 mil hab.', +(m.length / pob * 1e5).toFixed(1)) : ''}
+      ${gid ? '' : fila('#94a3b8', 'Provincias completas', provIds.size) + fila('#94a3b8', 'Distritos sueltos', distIds.size)}</div>
+    <div class="mi-nota">Elige una zona en los combos o haz clic en el mapa para ver su resumen.</div>`;
+}
+
+// --- Pantalla completa del mapa ---
+const cardMapa = document.getElementById('card-mapa'), btnCompleta = document.getElementById('completa');
+function marcarCompleta(si) {
+  cardMapa.classList.toggle('completa', si);
+  btnCompleta.querySelector('use').setAttribute('href', '/iconos.svg#' + (si ? 'contraer' : 'expandir'));
+  btnCompleta.querySelector('span').textContent = si ? 'Salir de pantalla completa' : 'Pantalla completa';
+  document.body.style.overflow = si ? 'hidden' : '';
+  setTimeout(() => {
+    map.resize();
+    // en computadora el panel va a la izquierda: el mapa se centra en el espacio que queda libre
+    map.setPadding({ top: 0, right: 0, bottom: 0, left: si && innerWidth > 700 ? 330 : 0 });
+    zonaActual ? Filtro.acercar(map, zonaActual) : map.fitBounds(AREA, { padding: 30, duration: 500 });
+  }, 80);
+}
+btnCompleta.onclick = () => {
+  if (cardMapa.classList.contains('completa')) {
+    document.fullscreenElement ? document.exitFullscreen() : marcarCompleta(false);
+  } else if (cardMapa.requestFullscreen) {
+    cardMapa.requestFullscreen().catch(() => marcarCompleta(true)); // si el navegador no deja, ocupa la ventana
+  } else marcarCompleta(true);
+};
+document.addEventListener('fullscreenchange', () => marcarCompleta(document.fullscreenElement === cardMapa));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && cardMapa.classList.contains('completa') && !document.fullscreenElement) marcarCompleta(false);
 });
 
 // --- Pantalla de carga: se va cuando los gráficos están listos (y el mapa, si se abre en su pestaña) ---
@@ -595,12 +694,13 @@ map.on('load', async () => {
     apagado: g => !visible(g) && !(g[0] === '8' && [...distIds].some(x => x.slice(1, 5) === g.slice(1, 5))),
     alElegir: gid => {
       marcarLista(gid);
-      Dash.filtrar(gid, gid ? Filtro.nombre(datos, gid) : null);
+      filtrarTodo(gid, gid ? Filtro.nombre(datos, gid) : null);
       if (!gid) return verTodo();
       const caja = gid[0] === '7' && !fullRegs.has(gid) && cajaDe(visiblesDe(gid));
       caja ? map.fitBounds(caja, { padding: 40, duration: 900 }) : Filtro.acercar(map, gid);
     } });
 
+  pintarInfoMapa(zonaActual);   // ya se conoce el territorio: población total
   map.once('idle', () => {
     listoMapa = true;
     document.getElementById('map-cargando').classList.add('listo');
