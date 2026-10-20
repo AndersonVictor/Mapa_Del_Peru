@@ -46,6 +46,7 @@
   /* logo de la institución; el filtro engrosa los trazos finos de las imágenes blancas */
   .cab-logo { flex: none; display: flex; align-items: center; }
   .logo-img { display: block; height: 52px; width: auto; }
+  .cab-texto { display: none; }   /* solo en el celular, en lugar del logo */
   .titulo-img { filter: drop-shadow(0 0 .4px #fff); }
   /* presidente y gestión, en amarillo a la derecha */
   .gestion { margin-left: auto; text-align: right; color: #fcd34d; font-size: 14px; line-height: 1.45; white-space: nowrap; }
@@ -232,10 +233,11 @@
   @media (max-width: 700px) {
     /* celular: todo centrado, uno debajo del otro: título, logo y presidente / gestión */
     .cab { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 16px 12px; min-height: 0; }
+    .cab-logo { display: none; }
+    .cab-texto { display: block; order: 0; font-size: 13.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: #fff; text-align: center; }
     .titulo-img { order: 1; position: static; transform: none; display: block; width: auto; height: auto;
       max-width: 100%; max-height: 64px; margin: 0 auto; }
-    .cab-logo { order: 2; justify-content: center; }
-    .logo-img { height: 38px; }
     .gestion { order: 3; align-self: stretch; margin: 2px 0 0; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.18);
       text-align: center; font-size: 12.5px; line-height: 1.45; white-space: normal; }
     .cab h1 { font-size: 16px; } .cab small { font-size: 12.5px; }
@@ -267,7 +269,7 @@
     .gran-total b { font-size: 36.5px; }
   }
   @media (max-width: 380px) {
-    .logo-img { height: 34px; } .titulo-img { max-height: 54px; } .gestion { font-size: 12px; }
+    .cab-texto { font-size: 12.5px; } .titulo-img { max-height: 54px; } .gestion { font-size: 12px; }
   }
 </style>
 </head>
@@ -281,6 +283,7 @@
 </div>
 <header class="cab">
   <div class="cab-logo"><img class="logo-img" src="/src/img/logo_cab.png" alt="Corte Superior de Justicia de Junín"></div>
+  <div class="cab-texto">Corte Superior de Justicia de Junín</div>
   <img class="titulo-img" src="/src/img/titulo.png" alt="" onerror="this.remove()">
   <div class="gestion">
     <div><b>Presidente:</b> Dr. Ricardo Corrales Melgarejo</div>
