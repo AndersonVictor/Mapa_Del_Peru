@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard CSJ Junín</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f1d2d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v17M8 20h8M4 7h16'/%3E%3Cpath d='M7 7l-3 6a3 3 0 0 0 6 0L7 7zM17 7l-3 6a3 3 0 0 0 6 0l-3-6z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/vendor/maplibre-gl.css">
+<style>
+  :root {
+    --granate: #7f1d2d; --granate-2: #a3263b; --azul: #0056a1; --fondo: #f3f4f7; --tarjeta: #ffffff;
+    --borde: #e7e9ef; --texto: #111827; --suave: #6b7280; --tenue: #9ca3af;
+    --sombra: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--texto); background: var(--fondo); }
+  [hidden] { display: none !important; }
+
+  /* --- pantalla de carga (al abrir el dashboard) --- */
+  #cargando { position: fixed; inset: 0; z-index: 100; background: var(--fondo); display: grid; place-items: center;
+    transition: opacity .35s ease, visibility .35s ease; }
+  #cargando.listo { opacity: 0; visibility: hidden; }
+  .caja-carga { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .caja-carga b { font-size: 17px; color: var(--granate); letter-spacing: .01em; }
+  .caja-carga small { font-size: 13px; color: var(--suave); }
+  .giro { width: 46px; height: 46px; border-radius: 50%; border: 4px solid #ead3d7; border-top-color: var(--granate);
+    animation: girar .8s linear infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  #map-cargando { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(238,241,245,.85);
+    transition: opacity .3s; }
+  #map-cargando.listo { opacity: 0; pointer-events: none; }
+  #map-cargando .giro { width: 34px; height: 34px; border-width: 3px; }
+  .ic { width: 18px; height: 18px; flex: none; }
+
+  /* --- encabezado --- */
+  .cab { background: var(--granate); color: #fff; min-height: 92px;
+    padding: 14px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .logo { width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.12); display: grid; place-items: center; }
+  .logo .ic { width: 24px; height: 24px; }
+  .cab h1 { font-size: 19.5px; margin: 0; font-weight: 800; letter-spacing: -.01em; }
+  .cab small { color: #f3d9dd; font-size: 13.5px; }
+  /* imagen del título (src/img/titulo.png): centrada en el encabezado */
+  .cab { position: relative; }
+  .titulo-img { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-height: 78px; max-width: calc(100% - 680px);
+    object-fit: contain; pointer-events: none; }
+  /* logo de la institución; el filtro engrosa los trazos finos de las imágenes blancas */
+  .cab-logo { flex: none; display: flex; align-items: center; }
+  .logo-img { display: block; height: 52px; width: auto; }
+  .cab-texto { display: none; }   /* solo en el celular, en lugar del logo */
+  .titulo-img { filter: drop-shadow(0 0 .4px #fff); }
+  /* presidente y gestión, en amarillo a la derecha */
+  .gestion { margin-left: auto; text-align: right; color: #fcd34d; font-size: 14px; line-height: 1.45; white-space: nowrap; }
+  .gestion b { font-weight: 700; }
+  .gestion .lema { font-style: italic; font-weight: 600; }
+
+  /* --- pestañas --- */
+  .tabs { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid var(--borde);
+    display: flex; gap: 10px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+  .tabs button { font: inherit; font-size: 15px; font-weight: 600; color: var(--suave); background: none; border: 0;
+    border-bottom: 3px solid transparent; padding: 13px 12px 11px; cursor: pointer; display: inline-flex; align-items: center;
+    gap: 7px; white-space: nowrap; transition: color .15s, border-color .15s; }
+  .tabs button:hover { color: var(--texto); }
+  .tabs button:first-child { margin-left: auto; } .tabs button:last-child { margin-right: auto; } /* centrado sin cortar */
+  .tabs button.on { color: var(--granate); border-bottom-color: var(--granate); }
+
+  /* --- tarjetas de indicadores --- */
+  .kpis { display: grid; grid-template-columns: 1.2fr repeat(5, 1fr); gap: 16px; padding: 20px 20px 6px; }
+  .kpi { --c: var(--granate); --t: #f6e8ea; position: relative; overflow: hidden; background: var(--tarjeta);
+    border: 1px solid var(--borde); border-top: 4px solid var(--c); border-radius: 16px; padding: 16px 18px 14px;
+    min-height: 132px; display: flex; flex-direction: column; box-shadow: var(--sombra);
+    transition: transform .18s ease, box-shadow .18s ease; }
+  .kpi:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(16,24,40,.10); }
+  .kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .kpi-lbl { font-size: 13px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .05em; }
+  .kpi .chip { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none;
+    background: var(--t); color: var(--c); }
+  .kpi .chip .ic { width: 22px; height: 22px; }
+  .kpi b { font-size: 36px; font-weight: 800; line-height: 1; letter-spacing: -.02em; margin: 10px 0 10px; color: var(--texto); }
+  .kpi-bar { height: 6px; border-radius: 99px; background: var(--t); overflow: hidden; }
+  .kpi-bar i { display: block; height: 100%; width: 0; background: var(--c); border-radius: 99px; transition: width .6s ease; }
+  .kpi small { font-size: 12.5px; color: var(--tenue); margin-top: 6px; font-weight: 500; }
+  .kpi small span { color: var(--c); font-weight: 800; }
+  .kpi-fondo { position: absolute; right: -14px; bottom: -16px; width: 92px; height: 92px; color: var(--c); opacity: .07;
+    pointer-events: none; }
+  .kpi.total { background: var(--granate); border: 0; border-top: 4px solid #5e1220; color: #fff; }
+  .kpi.total .kpi-lbl { color: #f6dfe3; }
+  .kpi.total .chip { background: rgba(255,255,255,.16); color: #fff; }
+  .kpi.total b { color: #fff; font-size: 44px; }
+  .kpi.total small { color: #f6dfe3; font-size: 13px; margin-top: auto; }
+  .kpi.total small span { color: #fff; }
+  .kpi.total .kpi-fondo { color: #fff; opacity: .1; width: 110px; height: 110px; }
+  .activo { margin: 12px 20px 0; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--azul);
+    background: #e8f1fa; border: 1px solid #cfe1f3; border-radius: 999px; padding: 6px 8px 6px 12px; }
+  .activo .ic { width: 15px; height: 15px; }
+  .activo button { font: inherit; font-size: 14px; font-weight: 600; border: 0; background: var(--azul); color: #fff;
+    border-radius: 999px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .activo button .ic { width: 13px; height: 13px; }
+
+  /* --- rejilla y tarjetas --- */
+  main { padding: 16px 20px 28px; }
+  .g { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+  .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; } .s6 { grid-column: span 6; }
+  .s7 { grid-column: span 7; } .s8 { grid-column: span 8; } .s12 { grid-column: span 12; }
+  .card { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 16px; padding: 16px 18px; min-width: 0; box-shadow: var(--sombra); }
+  .card h3 { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--texto); display: flex; align-items: center;
+    gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+  .card h3 small { color: var(--tenue); font-weight: 500; font-size: 13px; }
+  .ch { height: 270px; } .ch.alto { height: 340px; } .ch.bajo { height: 200px; }
+  .sub2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .nota { color: var(--tenue); font-size: 12.5px; margin: 8px 0 0; }
+  .actualizado { display: flex; justify-content: flex-end; margin: 0 0 12px; }
+  .actualizado span { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
+    background: var(--granate); color: #fff; font-size: 13px; box-shadow: var(--sombra); }
+  .actualizado span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fcd34d; }
+  .pie { margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--borde); font-size: 12.5px; color: var(--suave); }
+  .pie b { color: var(--texto); }
+  select, input[type=search] { font: inherit; font-size: 14.5px; padding: 7px 10px; border: 1px solid #d9dde5; border-radius: 10px; background: #fff; color: var(--texto); }
+  input[type=search] { min-width: 220px; padding-left: 30px;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E") no-repeat 9px center / 15px; }
+  .seccion { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 16px; font-weight: 800; color: var(--texto); margin: 6px 0 -4px; }
+  .seccion small { color: var(--suave); font-weight: 500; font-size: 13.5px; }
+
+  /* --- leyenda de donas --- */
+  .ley-dona { display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; margin-top: 4px; }
+  .ley-dona div { min-width: 0; }
+  .ley-dona .t { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--suave); font-weight: 600; }
+  .ley-dona .t .ic { width: 16px; height: 16px; }
+  .ley-dona .t i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .ley-dona b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+  .ley-dona small { color: var(--tenue); font-size: 13px; font-weight: 600; }
+
+  /* --- mapa --- */
+  .barra-mapa { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+  #combos { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
+  #combos .combo { min-width: 140px; }
+  .btn { font: inherit; font-size: 14.5px; font-weight: 600; border: 1px solid #d9dde5; background: #fff; border-radius: 10px;
+    padding: 8px 12px; cursor: pointer; color: var(--texto); text-decoration: none; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { border-color: var(--azul); color: var(--azul); }
+  .btn .ic { width: 15px; height: 15px; }
+  .btn.primario { background: var(--granate); border-color: var(--granate); color: #fff; }
+  .modo { display: inline-flex; background: #f1f3f6; border-radius: 10px; padding: 3px; }
+  .modo button { font: inherit; font-size: 14px; font-weight: 600; border: 0; background: none; padding: 5px 10px; cursor: pointer;
+    color: var(--suave); border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; }
+  .modo button .ic { width: 14px; height: 14px; }
+  .modo button.on { background: #fff; color: var(--granate); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  /* --- mapa en pantalla completa: ocupa toda la pantalla y muestra el panel de resumen --- */
+  #card-mapa.completa { position: fixed; inset: 0; z-index: 90; border-radius: 0; border: 0; margin: 0;
+    display: flex; flex-direction: column; padding: 14px 20px 10px; }
+  #card-mapa.completa #mapwrap { flex: 1; height: auto; min-height: 0; }
+  #card-mapa.completa details { display: none; }
+  #map-info { display: none; }
+  #card-mapa.completa #map-info { display: block; position: absolute; top: 14px; left: 14px; z-index: 6; width: 300px;
+    max-height: calc(100% - 28px); overflow-y: auto; background: rgba(255,255,255,.97); border: 1px solid var(--borde);
+    border-radius: 16px; box-shadow: 0 10px 30px rgba(16,24,40,.14); padding: 16px 18px; }
+  #map-info .mi-k { font-size: 11.5px; font-weight: 700; color: var(--tenue); text-transform: uppercase; letter-spacing: .06em; }
+  #map-info h4 { margin: 2px 0 10px; font-size: 19px; font-weight: 800; color: var(--texto); }
+  #map-info .mi-total { background: var(--granate); color: #fff; border-radius: 12px; padding: 10px 14px; display: flex;
+    align-items: baseline; gap: 8px; }
+  #map-info .mi-total b { font-size: 32px; font-weight: 800; line-height: 1; }
+  #map-info .mi-total span { font-size: 13px; color: #f6dfe3; }
+  #map-info .mi-sec { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--borde); }
+  #map-info .mi-sec > div:first-child { font-size: 11.5px; font-weight: 700; color: var(--tenue); text-transform: uppercase;
+    letter-spacing: .05em; margin-bottom: 4px; }
+  #map-info .mi-f { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13.5px; padding: 2px 0; }
+  #map-info .mi-f span { display: inline-flex; align-items: center; gap: 8px; color: #374151; }
+  #map-info .mi-f i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  #map-info .mi-f b { font-weight: 800; }
+  #map-info .mi-f small { color: var(--tenue); font-weight: 600; margin-left: 4px; }
+  #map-info .mi-nota { font-size: 12px; color: var(--suave); margin-top: 10px; }
+  #mapwrap { position: relative; height: 540px; border-radius: 12px; overflow: hidden; background: #eef1f5; }
+  #map { position: absolute; inset: 0; }
+  #aviso { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 9; display: none;
+    max-width: min(520px, calc(100% - 32px)); background: #fff7e6; color: #7a4b00; border: 1px solid #f3d38b;
+    border-radius: 10px; padding: 10px 14px; font-size: 14.5px; line-height: 1.5; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--suave); margin-top: 10px; }
+  .leyenda .sin-comp { background: #e3e6eb repeating-linear-gradient(135deg, rgba(100,116,139,.45) 0 1.5px, transparent 1.5px 5px); }
+  .leyenda span { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; }
+  details { margin-top: 10px; font-size: 13.5px; border-top: 1px solid var(--borde); padding-top: 10px; }
+  summary { cursor: pointer; color: var(--texto); font-weight: 600; display: flex; align-items: center; gap: 7px; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary .ic { width: 16px; height: 16px; color: var(--suave); }
+  summary.aviso-t { color: #9a5b00; } summary.aviso-t .ic { color: #d97706; }
+  ul { list-style: none; margin: 0; padding: 0; columns: 2; }
+  li { padding: 4px 6px; border-radius: 6px; cursor: pointer; display: flex; gap: 7px; align-items: baseline; break-inside: avoid; }
+  li:hover, li.activo { background: #eef4fb; }
+  li .niv { font-size: 10.5px; font-weight: 700; border-radius: 4px; padding: 1px 5px; flex: none; }
+  li .n-DEPARTAMENTO { background: #eceff3; color: #374151; } li .n-PROVINCIA { background: #fef3c7; color: #92400e; } li .n-DISTRITO { background: #ede9fe; color: #5b21b6; }
+  li small { color: var(--tenue); } li.falta { color: #b91c1c; cursor: default; } li.fuera { color: var(--tenue); cursor: default; }
+  h4.grupo { margin: 10px 0 4px; font-size: 12px; color: var(--tenue); text-transform: uppercase; letter-spacing: .05em; }
+  .avisos div { margin-top: 4px; color: #92400e; }
+
+  /* --- tablas --- */
+  .tabla { max-height: 440px; overflow: auto; border: 1px solid var(--borde); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { position: sticky; top: 0; background: #f8f9fb; color: var(--suave); text-align: left; padding: 10px 12px; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--borde); }
+  td { padding: 8px 12px; border-bottom: 1px solid #f1f2f5; }
+  td small { color: var(--tenue); } td.n { text-align: right; font-variant-numeric: tabular-nums; } td.vacio { text-align: center; color: var(--tenue); padding: 18px; }
+  tbody tr:hover td { background: #fafbfd; }
+  .chip { border-radius: 999px; padding: 2px 9px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .sexo { display: inline-flex; align-items: center; gap: 5px; } .sexo .ic { width: 15px; height: 15px; }
+
+  /* --- población: mini gráficos --- */
+  #pob-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .mini { border: 1px solid var(--borde); border-radius: 12px; padding: 8px 10px 4px; }
+  .mini-t { font-size: 13.5px; font-weight: 700; }
+  .ch-mini { height: 120px; }
+
+  /* --- personal --- */
+  .gran-total { background: var(--granate); color: #fff; border-radius: 16px;
+    padding: 22px 26px; display: flex; align-items: center; gap: 18px; box-shadow: var(--sombra); }
+  .gran-total .chip { width: 62px; height: 62px; border-radius: 16px; background: rgba(255,255,255,.14); display: grid; place-items: center; }
+  .gran-total .chip .ic { width: 32px; height: 32px; }
+  .gran-total b { font-size: 49.5px; font-weight: 800; line-height: 1; letter-spacing: -.02em; display: block; }
+  .gran-total span { font-size: 14px; font-weight: 600; color: #f6dfe3; letter-spacing: .06em; text-transform: uppercase; }
+  #pe-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; height: 100%; }
+  .reg { background: #fff; border: 1px solid var(--borde); border-radius: 16px; padding: 16px 18px; box-shadow: var(--sombra);
+    border-top: 4px solid var(--c); display: flex; flex-direction: column; justify-content: center; }
+  .reg-h { font-weight: 700; font-size: 14.5px; color: var(--suave); }
+  .reg-v { font-size: 36.5px; font-weight: 800; letter-spacing: -.02em; color: var(--texto); }
+  .reg-p { margin-top: 6px; height: 6px; border-radius: 99px; background: #f1f2f5; overflow: hidden; }
+  .reg-p i { display: block; height: 100%; background: var(--c); border-radius: 99px; }
+  .reg small { color: var(--tenue); font-size: 13px; margin-top: 4px; }
+
+  @media (max-width: 1150px) {
+    .kpis { grid-template-columns: repeat(3, 1fr); }
+    .s3, .s4, .s5 { grid-column: span 6; } .s7, .s8 { grid-column: span 12; }
+    #pob-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 1200px) {
+    .tabs { flex-wrap: wrap; justify-content: center; gap: 2px 6px; }
+    .tabs button { padding: 11px 10px 9px; font-size: 14px; }
+    .tabs button:first-child, .tabs button:last-child { margin: 0; }
+    .cab { flex-wrap: wrap; }
+    .titulo-img { position: static; transform: none; order: 3; flex-basis: 100%; max-width: 100%; max-height: 60px; }
+    .gestion { order: 2; }
+  }
+  @media (max-width: 700px) {
+    /* celular: todo centrado, uno debajo del otro: título, logo y presidente / gestión */
+    .cab { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 16px 12px; min-height: 0; }
+    .cab-logo { display: none; }
+    .cab-texto { display: block; order: 0; font-size: 13.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: #fff; text-align: center; }
+    .titulo-img { order: 1; position: static; transform: none; display: block; width: auto; height: auto;
+      max-width: 100%; max-height: 64px; margin: 0 auto; }
+    .gestion { order: 3; align-self: stretch; margin: 2px 0 0; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.18);
+      text-align: center; font-size: 12.5px; line-height: 1.45; white-space: normal; }
+    .cab h1 { font-size: 16px; } .cab small { font-size: 12.5px; }
+    .logo { width: 36px; height: 36px; border-radius: 10px; }
+
+    /* pestañas en el celular: todas a la vista, como botones en dos columnas */
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 16px; overflow: visible; }
+    .tabs button { border: 1px solid var(--borde); border-radius: 10px; padding: 9px 10px; font-size: 13.5px;
+      white-space: normal; text-align: left; line-height: 1.2; }
+    .tabs button.on { background: var(--granate); color: #fff; border-color: var(--granate); }
+    .tabs button:last-child:nth-child(odd) { grid-column: span 2; }
+    .tabs button:first-child, .tabs button:last-child { margin: 0; }
+    .kpis { grid-template-columns: repeat(2, 1fr); padding: 14px 16px 0; gap: 10px; }
+    .kpi { padding: 12px 14px; min-height: 0; } .kpi .chip { width: 32px; height: 32px; border-radius: 10px; }
+    .kpi .chip .ic { width: 18px; height: 18px; } .kpi-lbl { font-size: 11px; }
+    .kpi b { font-size: 26px; margin: 8px 0; } .kpi.total b { font-size: 32px; } .kpi-fondo { width: 64px; height: 64px; }
+    .kpi.total { grid-column: span 2; }
+    main { padding: 12px 16px 24px; }
+    .s3, .s4, .s5, .s6 { grid-column: span 12; }
+    .sub2 { grid-template-columns: 1fr; }
+    #completa span { display: none; }
+    #card-mapa.completa { padding: 10px 12px 6px; }
+    #card-mapa.completa .leyenda { display: none !important; }
+    #card-mapa.completa #map-info { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 42%; padding: 12px 14px; }
+    ul { columns: 1; }
+    #mapwrap { height: 420px; }
+    #pob-mini { grid-template-columns: 1fr; }
+    input[type=search] { min-width: 0; width: 100%; }
+    .gran-total b { font-size: 36.5px; }
+  }
+  @media (max-width: 380px) {
+    .cab-texto { font-size: 12.5px; } .titulo-img { max-height: 54px; } .gestion { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="cargando" role="status" aria-live="polite">
+  <div class="caja-carga">
+    <div class="giro"></div>
+    <b>Cargando dashboard</b>
+    <small id="cargando-txt">Preparando datos, mapa y gráficos…</small>
+  </div>
+</div>
+<header class="cab">
+  <div class="cab-logo"><img class="logo-img" src="/src/img/logo_cab.png" alt="Corte Superior de Justicia de Junín"></div>
+  <div class="cab-texto">Corte Superior de Justicia de Junín</div>
+  <img class="titulo-img" src="/src/img/titulo.png" alt="" onerror="this.remove()">
+  <div class="gestion">
+    <div><b>Presidente:</b> Dr. Ricardo Corrales Melgarejo</div>
+    <div><b>Gestión:</b> 2025-2026</div>
+    <div class="lema">Justicia pronta, honesta e inclusiva.</div>
+  </div>
+</header>
+<nav class="tabs">
+  <button data-tab="pob"><svg class="ic"><use href="/iconos.svg#tendencia"/></svg>Proyecciones poblacionales</button>
+  <button data-tab="res"><svg class="ic"><use href="/iconos.svg#edificio"/></svg>Resumen y detalle por provincia</button>
+  <button data-tab="cp"><svg class="ic"><use href="/iconos.svg#carpeta"/></svg>Carga procesal</button>
+  <button data-tab="au"><svg class="ic"><use href="/iconos.svg#microfono"/></svg>Audiencias</button>
+  <button data-tab="pe"><svg class="ic"><use href="/iconos.svg#personas"/></svg>Personal jurisdiccional</button>
+</nav>
+
+<section class="kpis">
+  <div class="kpi total">
+    <div class="kpi-top"><span class="kpi-lbl">Jueces y juezas</span><div class="chip"><svg class="ic"><use href="/iconos.svg#mazo"/></svg></div></div>
+    <b id="k-total">–</b>
+    <small><span id="k-organos">–</span> órganos jurisdiccionales</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#escala"/></svg>
+  </div>
+  <div class="kpi" style="--c:#0056a1;--t:#e6eef7">
+    <div class="kpi-top"><span class="kpi-lbl">Varones</span><div class="chip"><svg class="ic"><use href="/iconos.svg#hombre"/></svg></div></div>
+    <b id="k-var">–</b>
+    <div class="kpi-bar"><i id="k-var-bar"></i></div>
+    <small><span id="k-var-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#hombre"/></svg>
+  </div>
+  <div class="kpi" style="--c:#e8559a;--t:#fde7f1">
+    <div class="kpi-top"><span class="kpi-lbl">Mujeres</span><div class="chip"><svg class="ic"><use href="/iconos.svg#mujer"/></svg></div></div>
+    <b id="k-muj">–</b>
+    <div class="kpi-bar"><i id="k-muj-bar"></i></div>
+    <small><span id="k-muj-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#mujer"/></svg>
+  </div>
+  <div class="kpi" style="--c:#16a34a;--t:#e7f6ec">
+    <div class="kpi-top"><span class="kpi-lbl">Titulares</span><div class="chip"><svg class="ic"><use href="/iconos.svg#titular"/></svg></div></div>
+    <b id="k-tit">–</b>
+    <div class="kpi-bar"><i id="k-tit-bar"></i></div>
+    <small><span id="k-tit-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#titular"/></svg>
+  </div>
+  <div class="kpi" style="--c:#d97706;--t:#fef3e2">
+    <div class="kpi-top"><span class="kpi-lbl">Supernumerarios</span><div class="chip"><svg class="ic"><use href="/iconos.svg#supernumerario"/></svg></div></div>
+    <b id="k-sup">–</b>
+    <div class="kpi-bar"><i id="k-sup-bar"></i></div>
+    <small><span id="k-sup-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#supernumerario"/></svg>
+  </div>
+  <div class="kpi" style="--c:#7c5cf0;--t:#f0edfe">
+    <div class="kpi-top"><span class="kpi-lbl">Provisionales</span><div class="chip"><svg class="ic"><use href="/iconos.svg#provisional"/></svg></div></div>
+    <b id="k-prov">–</b>
+    <div class="kpi-bar"><i id="k-prov-bar"></i></div>
+    <small><span id="k-prov-p">–</span> del total</small>
+    <svg class="kpi-fondo"><use href="/iconos.svg#provisional"/></svg>
+  </div>
+</section>
+<div class="activo" id="filtro-activo" hidden><svg class="ic"><use href="/iconos.svg#pin"/></svg>Mostrando solo <b id="k-sel"></b>
+  <button id="quitar"><svg class="ic"><use href="/iconos.svg#cerrar"/></svg>Ver toda la Corte</button></div>
+
+<main>
+  <!-- 1) PROYECCIONES POBLACIONALES -->
+  <section class="tab" id="tab-pob" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
+    <div class="g">
+      <div class="card s6"><h3>Población total proyectada por provincia <small>2026 – 2031</small></h3><div class="ch alto" id="c-pob-area"></div></div>
+      <div class="card s3"><h3>Población por provincia <select id="pob-anio" aria-label="Año"></select></h3><div class="ch alto" id="c-pob-barras"></div></div>
+      <div class="card s3"><h3>Jueces por 100 mil habitantes</h3><div class="ch alto" id="c-pob-100k"></div>
+        <p class="nota">En granate: total de la Corte y referencia nacional.</p></div>
+      <div class="card s12"><h3>Varones y mujeres por provincia
+        <span class="leyenda" style="margin:0"><span style="background:#0056a1"></span>Varones <span style="background:#e8559a;margin-left:10px"></span>Mujeres</span></h3>
+        <div id="pob-mini"></div></div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> INEI</footer>
+  </section>
+
+  <!-- 2) RESUMEN Y DETALLE POR PROVINCIA -->
+  <section class="tab" id="tab-res" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
+    <div class="g">
+      <div class="card s7" id="card-mapa">
+        <h3>Jueces y juezas en el territorio
+          <span class="modo"><button data-modo="jueces"><svg class="ic"><use href="/iconos.svg#escala"/></svg>Jueces</button><button data-modo="poblacion"><svg class="ic"><use href="/iconos.svg#personas"/></svg>Población</button></span></h3>
+        <div class="barra-mapa">
+          <div id="combos"></div>
+          <button class="btn" id="todo"><svg class="ic"><use href="/iconos.svg#refrescar"/></svg>Ver todo</button>
+          <button class="btn" id="completa" title="Ver el mapa en pantalla completa"><svg class="ic"><use href="/iconos.svg#expandir"/></svg><span>Pantalla completa</span></button>
+        </div>
+        <div id="mapwrap"><div id="map-cargando"><div class="giro"></div></div><div id="map"></div>
+          <aside id="map-info" aria-live="polite"></aside><div id="tip"></div><div id="aviso"></div></div>
+        <div class="leyenda" id="ley-jueces"></div>
+        <div class="leyenda" id="ley-poblacion" hidden>
+          <div><span style="background:#fcd34d"></span>Provincia con competencia (completa)</div>
+          <div><span style="background:#a78bfa"></span>Distrito con competencia</div>
+          <div><span class="sin-comp"></span>Sin competencia territorial</div>
+        </div>
+        <details><summary><svg class="ic"><use href="/iconos.svg#lista"/></svg>Territorio de la Corte (competencias.xlsx)</summary>
+          <div id="lista"></div>
+          <p class="nota"><a class="btn" href="/api/territorio.xlsx"><svg class="ic"><use href="/iconos.svg#descarga"/></svg>Descargar el territorio con datos del censo</a></p>
+        </details>
+        <details id="avisos-box" hidden><summary class="aviso-t"><svg class="ic"><use href="/iconos.svg#alerta"/></svg>Revisar en dashboard.xlsx (<span id="avisos-n"></span>)</summary><div class="avisos" id="avisos"></div></details>
+      </div>
+      <div class="s5" style="min-width:0">
+        <div class="card"><h3>Jueces y juezas por provincia</h3><div class="ch" id="c-prov-sexo"></div></div>
+        <div class="sub2">
+          <div class="card"><h3>Por sexo</h3><div class="ch bajo" id="c-genero"></div><div class="ley-dona" id="c-genero-ley"></div></div>
+          <div class="card"><h3>Por instancia</h3><div class="ch" id="c-inst"></div></div>
+        </div>
+      </div>
+      <div class="card s4"><h3>Condición</h3><div class="ch bajo" id="c-cond"></div><div class="ley-dona" id="c-cond-ley"></div></div>
+      <div class="card s4"><h3>Instancia por provincia</h3><div class="ch" id="c-inst-prov"></div></div>
+      <div class="card s4"><h3>Condición por provincia</h3><div class="ch" id="c-cond-prov"></div></div>
+      <div class="card s12">
+        <h3><span>Detalle de jueces y juezas <small id="t-mag-n"></small></span> <input type="search" id="t-mag-buscar" placeholder="Buscar nombre, especialidad o sede"></h3>
+        <div class="tabla"><table>
+          <thead><tr><th>Apellidos y nombres</th><th>Sexo</th><th>Instancia</th><th>Especialidad</th><th>Sede</th><th>Condición</th></tr></thead>
+          <tbody id="t-mag"></tbody></table></div>
+      </div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> Base de datos institucional</footer>
+  </section>
+
+  <!-- 3) CARGA PROCESAL -->
+  <section class="tab" id="tab-cp" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
+    <div class="g">
+      <div class="card s5"><h3>Carga procesal, ingresos y resueltos</h3><div class="ch alto" id="c-cp-anual"></div></div>
+      <div class="card s4"><h3>Expedientes resueltos por especialidad</h3><div class="ch alto" id="c-cp-resueltos"></div></div>
+      <div class="card s3"><h3>Composición de la carga</h3><div class="ch alto" id="c-cp-100"></div></div>
+      <div class="card s4"><h3>Ingresos por especialidad</h3><div class="ch" id="c-cp-ingresos"></div></div>
+      <div class="card s3"><h3>Tasa de resolución</h3><div class="ch" id="c-cp-tasa"></div>
+        <p class="nota">Resueltos ÷ ingresos. Sobre 100%: se resolvió más de lo que ingresó.</p></div>
+      <div class="card s5"><h3>Órganos con sobrecarga <small>% sobre la carga máxima</small></h3><div class="ch" id="c-sobrecarga"></div></div>
+    </div>
+    <p class="nota">El último año puede ser parcial (datos hasta la fecha de corte).</p>
+    <footer class="pie"><b>Fuente:</b> Base de datos institucional | INEI</footer>
+  </section>
+
+  <!-- 4) AUDIENCIAS -->
+  <section class="tab" id="tab-au" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
+    <div class="g">
+      <div class="s12 seccion"><span>Nuevo Código Procesal Penal <small>· por sede</small></span>
+        <label style="font-size:12.5px;font-weight:600;color:var(--suave)">Año de la tasa <select id="au-anio"></select></label></div>
+      <div class="card s3"><h3>Audiencias programadas</h3><div class="ch" id="c-ncpp-prog"></div></div>
+      <div class="card s3"><h3>Tasa de atención</h3><div class="ch" id="c-ncpp-tasa"></div></div>
+      <div class="card s3"><h3>Total acumulado</h3><div class="ch" id="c-ncpp-acum"></div></div>
+      <div class="card s3"><h3>Tasa de atención <small id="t-ncpp-anio"></small></h3><div class="ch" id="c-ncpp-anio"></div></div>
+      <div class="s12 seccion"><span>Subsistema especializado <small>· por juzgado</small></span></div>
+      <div class="card s3"><h3>Audiencias programadas</h3><div class="ch" id="c-snej-prog"></div></div>
+      <div class="card s3"><h3>Tasa de atención</h3><div class="ch" id="c-snej-tasa"></div></div>
+      <div class="card s3"><h3>Total acumulado</h3><div class="ch" id="c-snej-acum"></div></div>
+      <div class="card s3"><h3>Tasa de atención <small id="t-snej-anio"></small></h3><div class="ch" id="c-snej-anio"></div></div>
+    </div>
+    <p class="nota">* Año parcial. Tasa de atención = atendidas (o realizadas) ÷ programadas.</p>
+    <footer class="pie"><b>Fuente:</b> Base de datos institucional</footer>
+  </section>
+
+  <!-- 5) PERSONAL JURISDICCIONAL -->
+  <section class="tab" id="tab-pe" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
+    <div class="g">
+      <div class="s12 gran-total"><div class="chip"><svg class="ic"><use href="/iconos.svg#personas"/></svg></div>
+        <div><b id="k-personal">–</b><span>Total personal jurisdiccional</span></div></div>
+      <div class="card s5"><h3>Por régimen laboral</h3><div class="ch" id="c-pe-dona"></div><div class="ley-dona" id="c-pe-dona-ley"></div></div>
+      <div class="s7"><div id="pe-cards"></div></div>
+      <div class="card s6"><h3>Cargos con más personal</h3><div class="ch alto" id="c-pe-cargos"></div></div>
+      <div class="card s6"><h3>Todos los cargos <input type="search" id="t-pe-buscar" placeholder="Buscar cargo"></h3>
+        <div class="tabla" style="max-height:340px"><table>
+          <thead><tr><th>Cargo</th><th>D.L. 728</th><th>CAS</th><th>Ley 29277</th><th>D.L. 276</th><th>Total</th></tr></thead>
+          <tbody id="t-pe"></tbody></table></div></div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> Base de datos institucional</footer>
+  </section>
+</main>
+
+<script src="/vendor/maplibre-gl.js"></script>
+<script src="/vendor/echarts.min.js"></script>
+<script src="/filtro.js"></script>
+<script src="/tooltip.js"></script>
+<script src="/graficos.js"></script>
+<script>
+function aviso(html) { const a = document.getElementById('aviso'); a.innerHTML = html; a.style.display = 'block'; }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const pad = v => String(v ?? '').split('.')[0].padStart(2, '0');
+
+// --- Pestañas ---
+let mapaVisto = false;
+// Tapa el mapa con el indicador de carga hasta que termine de dibujarse (así no aparece por partes)
+function cubrirMapa() {
+  const c = document.getElementById('map-cargando');
+  c.classList.remove('listo');
+  map.once('idle', () => c.classList.add('listo'));
+}
+// Pide al servidor los tiles que cubren 'caja' en esos zooms; quedan en la caché del navegador
+function precargarTiles(caja, zooms) {
+  const urls = [], mx = (caja[1][0] - caja[0][0]) * .6, my = (caja[1][1] - caja[0][1]) * .1;   // + margen de pantalla
+  caja = [[caja[0][0] - mx, caja[0][1] - my], [caja[1][0] + mx, caja[1][1] + my]];
+  for (const z of zooms) {
+    const n = 2 ** z;
+    const X = lon => Math.floor((lon + 180) / 360 * n);
+    const Y = lat => Math.floor((1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * n);
+    for (let x = X(caja[0][0]); x <= X(caja[1][0]); x++)
+      for (let y = Y(caja[1][1]); y <= Y(caja[0][1]); y++) urls.push(`${location.origin}/tiles/${z}/${x}/${n - 1 - y}.pbf`);
+  }
+  let i = 0;
+  const siguiente = () => { if (i < urls.length) fetch(urls[i++]).catch(() => {}).finally(siguiente); };
+  for (let k = 0; k < 4; k++) siguiente();   // 4 a la vez, sin saturar
+}
+function mostrarTab(tab) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  document.querySelectorAll('.tab').forEach(s => s.hidden = s.id !== 'tab-' + tab);
+  try { localStorage.setItem('tab', tab); } catch {}
+  if (tab === 'res') {
+    map.resize();
+    if (!mapaVisto) { mapaVisto = true; cubrirMapa(); map.fitBounds(AREA, { padding: 30, duration: 0 }); }
+  }
+  Dash.mostrar(tab);
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => mostrarTab(b.dataset.tab));
+
+// --- Mapa (Junín y Huancavelica) ---
+let AREA = [[-76.9, -14.2], [-73.3, -10.5]];
+const map = new maplibregl.Map({
+  container: 'map',
+  style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#eef2f5' } }] },
+  bounds: AREA, fitBoundsOptions: { padding: 30 },
+  maxZoom: 14, fadeDuration: 0, renderWorldCopies: false, attributionControl: false
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+let J = {}, modo = 'jueces';
+let datos = {}, regIds = new Set(), provIds = new Set(), distIds = new Set(), filtro = null;
+const fullRegs = new Set(), hidProv = new Set(), hidDist = new Set();
+// ¿Está en Junín / Huancavelica? (se dibuja; si no tiene competencia, en gris rayado)
+const enDeps = g => [...regIds].some(r => r.slice(1, 3) === g.slice(1, 3));
+// ¿Tiene competencia territorial? (provincia completa o distrito nombrado en competencias.xlsx)
+function visible(g) {
+  const dep = [...fullRegs].some(r => r.slice(1, 3) === g.slice(1, 3));
+  if (g[0] === '7') return regIds.has(g);
+  if (g[0] === '8') return !hidProv.has(g) && (dep || provIds.has(g));
+  const prov = '8' + g.slice(1, 5) + '00';
+  return !hidDist.has(g) && !hidProv.has(prov) && (dep || provIds.has(prov) || distIds.has(g));
+}
+
+// Zona elegida (combos, clic en el mapa o en una barra) -> filtra tarjetas y gráficos
+function elegirZona(gid) {
+  if (!filtro?.ir(gid)) { Filtro.marcar(map, gid); marcarLista(gid); Filtro.acercar(map, gid); filtrarTodo(gid, Filtro.nombre(datos, gid)); }
+}
+function verToda() { filtro?.reiniciar(); marcarLista(null); clear(); verTodo(); filtrarTodo(null); }
+document.getElementById('todo').onclick = verToda;
+document.getElementById('quitar').onclick = verToda;
+
+// Los datos del dashboard llegan en paralelo al mapa: los gráficos no esperan a los tiles
+const pJueces = fetch('/api/jueces').then(r => r.json()).catch(() => ({}));
+const pDatos = fetch('/api/datos').then(r => r.json()).catch(() => ({}));
+const pTerritorio = fetch('/api/territorio').then(r => r.json()).catch(() => ({}));
+Promise.all([pJueces, pDatos]).then(([j, d]) => {
+  J = j; datos = d;
+  Dash.iniciar({ tablas: J.tablas, alClicProvincia: gid => elegirZona(gid) });
+  pintarInfoMapa(zonaActual);
+  listoDatos = true;
+  requestAnimationFrame(() => requestAnimationFrame(quitarCarga));
+});
+// Avisos: lo que no cuadra en dashboard.xlsx y los nombres de competencias.xlsx que no se reconocieron
+Promise.all([pJueces, pTerritorio]).then(([j, terr]) => {
+  const av = [...(j.avisos || []), ...(terr.no_reconocido || []).map(a => 'competencias.xlsx: no se reconoció ' + a)];
+  document.getElementById('avisos-box').hidden = !av.length;
+  document.getElementById('avisos-n').textContent = av.length;
+  document.getElementById('avisos').innerHTML = av.map(a => `<div>• ${esc(a)}</div>`).join('');
+});
+
+// Zona elegida -> tarjetas, gráficos y panel del mapa en pantalla completa
+function filtrarTodo(gid, nombre) { Dash.filtrar(gid, nombre); pintarInfoMapa(gid, nombre); }
+
+// --- Panel de resumen (se ve en pantalla completa) ---
+let zonaActual = null, nombreZona = null;
+function pintarInfoMapa(gid, nombre) {
+  zonaActual = gid || null; nombreZona = gid ? (nombre ?? nombreZona) : null;
+  const M = J.tablas?.Magistrados || [], O = J.tablas?.Organos || [], N = Filtro.N;
+  const en = r => !gid || (gid[0] === '7' ? String(r.prov_id || '').slice(1, 3) === gid.slice(1, 3)
+                         : gid[0] === '8' ? r.prov_id === gid : r.dist_id === gid);
+  const m = M.filter(en), o = O.filter(en), cuenta = f => m.filter(f).length;
+  const f1 = n => n.toLocaleString('en-US', { maximumFractionDigits: 1 }).replace(/,/g, ' ').replace('.', ',');
+  const pct = n => m.length ? ` <small>${f1(n / m.length * 100)}%</small>` : '';
+  const fila = (color, txt, n, conPct) => `<div class="mi-f"><span><i style="background:${color}"></i>${txt}</span><b>${f1(n)}${conPct ? pct(n) : ''}</b></div>`;
+  const inst = r => { const i = N(r.INSTANCIA); return i === 'SALA' || i === 'JPL' ? i : 'JESP'; };
+  // población: la zona elegida o la suma del territorio con competencia
+  const pobDe = g => +String(datos[g]?.dato ?? '').replace(/[^\d]/g, '') || 0;
+  const pob = gid ? pobDe(gid) : [...provIds, ...distIds].reduce((s, g) => s + pobDe(g), 0);
+  const nivel = gid ? { 7: 'Departamento', 8: 'Provincia', 9: 'Distrito' }[gid[0]] : 'Toda la Corte';
+  const titulo = gid ? (nombreZona || Filtro.nombre(datos, gid)) : 'Corte Superior de Justicia de Junín';
+  document.getElementById('map-info').innerHTML = `
+    <div class="mi-k">${nivel}</div><h4>${esc(titulo)}</h4>
+    <div class="mi-total"><b>${f1(m.length)}</b><span>jueces y juezas</span></div>
+    <div class="mi-sec"><div>Por sexo</div>
+      ${fila(Dash.COLOR.varon, 'Varones', cuenta(r => N(r.SEXO).startsWith('VAR')), true)}
+      ${fila(Dash.COLOR.mujer, 'Mujeres', cuenta(r => N(r.SEXO).startsWith('MUJ')), true)}</div>
+    <div class="mi-sec"><div>Por condición</div>
+      ${fila(Dash.COLOR.titular, 'Titulares', cuenta(r => N(r.CONDICION)[0] === 'T'), true)}
+      ${fila(Dash.COLOR.supern, 'Supernumerarios', cuenta(r => N(r.CONDICION)[0] === 'S'), true)}
+      ${fila(Dash.COLOR.provis, 'Provisionales', cuenta(r => N(r.CONDICION)[0] === 'P'), true)}</div>
+    <div class="mi-sec"><div>Por instancia</div>
+      ${fila(Dash.COLOR.sala, 'Salas', cuenta(r => inst(r) === 'SALA'))}
+      ${fila(Dash.COLOR.jesp, 'Juzgados especializados', cuenta(r => inst(r) === 'JESP'))}
+      ${fila(Dash.COLOR.jpl, 'Juzgados de paz letrado', cuenta(r => inst(r) === 'JPL'))}</div>
+    <div class="mi-sec"><div>Territorio</div>
+      ${fila('#7f1d2d', 'Órganos jurisdiccionales', o.length)}
+      ${pob ? fila('#94a3b8', gid ? 'Población' : 'Población con competencia', pob) : ''}
+      ${pob && m.length ? fila('#94a3b8', 'Jueces por 100 mil hab.', +(m.length / pob * 1e5).toFixed(1)) : ''}
+      ${gid ? '' : fila('#94a3b8', 'Provincias completas', provIds.size) + fila('#94a3b8', 'Distritos sueltos', distIds.size)}</div>
+    <div class="mi-nota">Elige una zona en los combos o haz clic en el mapa para ver su resumen.</div>`;
+}
+
+// --- Pantalla completa del mapa ---
+const cardMapa = document.getElementById('card-mapa'), btnCompleta = document.getElementById('completa');
+function marcarCompleta(si) {
+  cardMapa.classList.toggle('completa', si);
+  btnCompleta.querySelector('use').setAttribute('href', '/iconos.svg#' + (si ? 'contraer' : 'expandir'));
+  btnCompleta.querySelector('span').textContent = si ? 'Salir de pantalla completa' : 'Pantalla completa';
+  document.body.style.overflow = si ? 'hidden' : '';
+  setTimeout(() => {
+    cubrirMapa();
+    map.resize();
+    // en computadora el panel va a la izquierda: el mapa se centra en el espacio que queda libre
+    map.setPadding({ top: 0, right: 0, bottom: 0, left: si && innerWidth > 700 ? 330 : 0 });
+    zonaActual ? Filtro.acercar(map, zonaActual) : map.fitBounds(AREA, { padding: 30, duration: 500 });
+  }, 80);
+}
+btnCompleta.onclick = () => {
+  if (cardMapa.classList.contains('completa')) {
+    document.fullscreenElement ? document.exitFullscreen() : marcarCompleta(false);
+  } else if (cardMapa.requestFullscreen) {
+    cardMapa.requestFullscreen().catch(() => marcarCompleta(true)); // si el navegador no deja, ocupa la ventana
+  } else marcarCompleta(true);
+};
+document.addEventListener('fullscreenchange', () => marcarCompleta(document.fullscreenElement === cardMapa));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && cardMapa.classList.contains('completa') && !document.fullscreenElement) marcarCompleta(false);
+});
+
+// --- Pantalla de carga: se va cuando los gráficos están listos (y el mapa, si se abre en su pestaña) ---
+let listoDatos = false, listoMapa = false;
+function quitarCarga(forzar) {
+  const tab = document.querySelector('.tabs button.on')?.dataset.tab;
+  if (!forzar && (!listoDatos || (tab === 'res' && !listoMapa))) return;
+  document.getElementById('cargando').classList.add('listo');
+}
+setTimeout(() => quitarCarga(true), 15000); // por si algo tarda demasiado
+let guardada = null;
+try { guardada = localStorage.getItem('tab'); } catch {}
+mostrarTab(['pob', 'res', 'cp', 'au', 'pe'].includes(guardada) ? guardada : 'pob');
+
+map.on('load', async () => {
+  const [d, terr, cfg] = await Promise.all([
+    pDatos,
+    pTerritorio,
+    fetch('/api/config').then(r => r.json()).catch(() => ({})),
+    pJueces.then(j => { J = j; })
+  ]);
+  datos = d;
+  if (!Object.keys(datos).length) aviso('Falta <b>datos.xlsx</b>. Debe estar junto a <code>server.py</code>.');
+  if (!terr.provincias?.length && !terr.distritos?.length) aviso('Falta <b>competencias.xlsx</b> junto a server.py (o no tiene competencias).');
+
+  // Qué se dibuja: el territorio de competencias.xlsx (columna "Competencia (Territorial)").
+  // Provincias nombradas -> completas; distritos nombrados sueltos -> solo esos (ej. 3 de Churcampa).
+  (terr.departamentos || []).forEach(g => regIds.add(g));
+  (terr.provincias || []).forEach(g => provIds.add(g));
+  (terr.distritos || []).forEach(g => distIds.add(g));
+  pintarTerritorio(terr);
+
+  // Expresiones sobre las propiedades del distrito en los tiles
+  const ID = ['to-number', ['get', 'id_geografia']];
+  const REG = ['to-number', ['coalesce', ['get', 'cod_region'], ['get', 'ccdd']]];
+  const PROV = ['+', ['*', ['to-number', ['get', 'ccdd']], 100], ['to-number', ['get', 'ccpp']]];
+  const lit = (xs) => ['literal', [...xs]];
+  const num = xs => [...xs].map(Number);
+  const fullCod = [...fullRegs].map(g => +g.slice(1, 3));
+  const provCod = [...provIds].map(g => +g.slice(1, 5));
+  const depDe = ['%', ['floor', ['/', ID, 10000]], 100]; // id 7/8/9 + ccdd... -> ccdd
+  const enDepsF = ['in', REG, lit([...regIds].map(g => +g.slice(1, 3)))];   // todo Junín y Huancavelica
+  const dentro = ['all',
+    ['any', ['in', REG, lit(fullCod)], ['in', PROV, lit(provCod)], ['in', ID, lit(num(distIds))]],
+    ['!', ['in', PROV, lit([...hidProv].map(g => +g.slice(1, 5)))]],
+    ['!', ['in', ID, lit(num(hidDist))]]];
+
+  map.addSource('base', { type: 'vector', tiles: [location.origin + '/tiles/{z}/{x}/{y}.pbf'],
+    scheme: 'tms', minzoom: 0, maxzoom: cfg.maxzoom || 10,
+    promoteId: { tb_region: 'id_geografia', tb_provincia: 'id_geografia', tb_distrito: 'id_geografia' } });
+  const fill = (id, layer, filter, color, opacity = 1) => map.addLayer({ id, type: 'fill', source: 'base',
+    'source-layer': layer, filter, paint: { 'fill-color': color, 'fill-opacity': opacity } });
+  const line = (id, layer, filter, color, w) => map.addLayer({ id, type: 'line', source: 'base',
+    'source-layer': layer, filter, paint: { 'line-color': color, 'line-width': w } });
+
+  fill('f-area', 'tb_distrito', enDepsF, '#f4f1ea');
+  // Sin competencia territorial: gris con rayas diagonales
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const x = c.getContext('2d'); x.strokeStyle = 'rgba(100,116,139,.45)'; x.lineWidth = 1.5;
+  x.beginPath(); x.moveTo(-4, 20); x.lineTo(20, -4); x.moveTo(-4, 4); x.lineTo(4, -4); x.moveTo(12, 20); x.lineTo(20, 12); x.stroke();
+  map.addImage('rayas', x.getImageData(0, 0, 16, 16), { pixelRatio: 2 });
+  const sinComp = ['all', enDepsF, ['!', dentro]];
+  fill('f-sin', 'tb_distrito', sinComp, '#e3e6eb');
+  map.addLayer({ id: 'f-sin-rayas', type: 'fill', source: 'base', 'source-layer': 'tb_distrito', filter: sinComp,
+    paint: { 'fill-pattern': 'rayas' } });
+  fill('f-prov', 'tb_distrito', ['all', dentro, ['in', PROV, lit(provCod)]], '#fcd34d', 0.6);
+  fill('f-dist', 'tb_distrito', ['all', dentro, ['in', ID, lit(num(distIds))]], '#a78bfa', 0.75);
+  // Jueces: provincias coloreadas por total de magistrados (dashboard.xlsx, hoja Magistrados)
+  const colores = ['match', PROV];
+  for (const [gid, p] of Object.entries(J.provincias || {})) colores.push(+gid.slice(1, 5), colorJueces(p.total));
+  fill('j-prov', 'tb_distrito', dentro, colores.length > 2 ? [...colores, '#f4f1ea'] : '#f4f1ea');
+  line('l-dist', 'tb_distrito', enDepsF, '#b9b2a3', ['interpolate', ['linear'], ['zoom'], 6, 0.3, 10, 0.9]);
+  line('l-prov', 'tb_provincia', ['in', depDe, lit([...regIds].map(g => +g.slice(1, 3)))], '#6b6458',
+    ['interpolate', ['linear'], ['zoom'], 6, 0.9, 10, 1.8]);
+  line('l-reg', 'tb_region', ['in', ID, lit(num(regIds))], '#2b2b2b', ['interpolate', ['linear'], ['zoom'], 6, 1.8, 10, 3]);
+
+  const on = ['boolean', ['feature-state', 'hover'], false];
+  for (const capa of ['tb_region', 'tb_provincia', 'tb_distrito']) {
+    map.addLayer({ id: 'h-' + capa, type: 'fill', source: 'base', 'source-layer': capa,
+      paint: { 'fill-color': '#c8102e', 'fill-opacity': ['case', on, 0.25, 0] } });
+    map.addLayer({ id: 'h-' + capa + '-o', type: 'line', source: 'base', 'source-layer': capa,
+      paint: { 'line-color': '#c8102e', 'line-width': ['case', on, 2.5, 0] } });
+  }
+  Filtro.agregarSeleccion(map, 'base');
+
+  // Jueces: una burbuja por sede (distrito), tamaño según cantidad
+  map.addSource('sedes', { type: 'geojson', data: { type: 'FeatureCollection',
+    features: (J.sedes || []).filter(s => s.lon != null).map(s => ({ type: 'Feature', properties: { id: s.id, total: s.total },
+      geometry: { type: 'Point', coordinates: [s.lon, s.lat] } })) } });
+  map.addLayer({ id: 'sedes-c', type: 'circle', source: 'sedes',
+    paint: { 'circle-radius': ['interpolate', ['linear'], ['sqrt', ['get', 'total']], 1, 6, 9, 24],
+      'circle-color': '#1f2937', 'circle-opacity': 0.8, 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
+  pintarLeyendaJueces();
+  let guardado = null;
+  try { guardado = localStorage.getItem('modo'); } catch {}
+  setModo(guardado === 'poblacion' ? 'poblacion' : 'jueces');
+
+  // Combos: lo de la lista que se ve (una provincia aparece también si tiene un distrito suelto visible, ej. Palca)
+  const permitido = g => g[0] === '8'
+    ? (visible(g) && provIds.has(g)) || [...distIds].some(x => visible(x) && x.slice(1, 5) === g.slice(1, 5))
+    : visible(g) && (distIds.has(g) || provIds.has('8' + g.slice(1, 5) + '00'));
+  const iniciales = () => Object.keys(datos).filter(g => g[0] === '8' && enDeps(g))
+    .concat([...distIds].filter(g => visible(g) && !visible('8' + g.slice(1, 5) + '00')));
+  const ext = await Filtro.extensiones();
+  const cajaDe = ids => {
+    const cs = ids.map(g => ext[g]).filter(Boolean);
+    return cs.length ? [[Math.min(...cs.map(c => c[0])), Math.min(...cs.map(c => c[1]))],
+                        [Math.max(...cs.map(c => c[2])), Math.max(...cs.map(c => c[3]))]] : null;
+  };
+  const visiblesDe = dep => [...provIds, ...distIds].filter(g => g.slice(1, 3) === dep.slice(1, 3) && visible(g));
+  filtro = Filtro.crear({ map, contenedor: document.getElementById('combos'), datos, area: regIds, permitido,
+    rotulable: enDeps, etiquetasIniciales: iniciales,
+    apagado: g => !visible(g) && !(g[0] === '8' && [...distIds].some(x => x.slice(1, 5) === g.slice(1, 5))),
+    alElegir: gid => {
+      marcarLista(gid);
+      filtrarTodo(gid, gid ? Filtro.nombre(datos, gid) : null);
+      if (!gid) return verTodo();
+      const caja = gid[0] === '7' && !fullRegs.has(gid) && cajaDe(visiblesDe(gid));
+      caja ? map.fitBounds(caja, { padding: 40, duration: 900 }) : Filtro.acercar(map, gid);
+    } });
+
+  pintarInfoMapa(zonaActual);   // ya se conoce el territorio: población total
+  map.once('idle', () => {
+    listoMapa = true;
+    document.getElementById('map-cargando').classList.add('listo');
+    quitarCarga();
+  });
+  // Encuadre: el territorio con competencia (lo que te compete); se puede mover por todo Junín y Huancavelica
+  const foco = cajaDe([...provIds, ...distIds]), deps = cajaDe([...regIds]);
+  if (foco) AREA = foco;
+  if (deps) map.setMaxBounds([[deps[0][0] - 2, deps[0][1] - 2], [deps[1][0] + 2, deps[1][1] + 2]]);
+  map.fitBounds(AREA, { padding: 30, duration: 0 });
+  // Si el mapa aún no se ve (otra pestaña), se bajan sus tiles en segundo plano: al abrirlo sale de una vez
+  if (document.getElementById('tab-res').hidden) precargarTiles(AREA, [6, 7, 8, 9]);
+});
+
+// --- Jueces en el mapa ---
+const ESCALA = [[50, '#8e1b2a'], [20, '#c0392b'], [10, '#e36b4f'], [5, '#f3a072'], [1, '#f9c9a4']];
+const colorJueces = n => (ESCALA.find(([min]) => n >= min) || [0, '#f4f1ea'])[1];
+
+function setModo(m) {
+  modo = m;
+  try { localStorage.setItem('modo', m); } catch {}
+  document.querySelectorAll('.modo button').forEach(b => b.classList.toggle('on', b.dataset.modo === m));
+  const ver = (id, si) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', si ? 'visible' : 'none');
+  ver('f-prov', m === 'poblacion'); ver('f-dist', m === 'poblacion');
+  ver('j-prov', m === 'jueces'); ver('sedes-c', m === 'jueces');
+  document.getElementById('ley-poblacion').hidden = m !== 'poblacion';
+  document.getElementById('ley-jueces').hidden = m !== 'jueces';
+  clear();
+}
+document.querySelectorAll('.modo button').forEach(b => b.onclick = () => setModo(b.dataset.modo));
+
+function pintarLeyendaJueces() {
+  const rangos = ESCALA.map(([min], i) => [min, i ? ESCALA[i - 1][0] - 1 : null]).reverse();
+  document.getElementById('ley-jueces').innerHTML =
+    rangos.map(([a, b]) => `<div><span style="background:${colorJueces(a)}"></span>${a}${b ? '–' + b : '+'} jueces</div>`).join('') +
+    `<div><span style="background:#f4f1ea;border:1px solid #ccc"></span>Sin jueces</div>` +
+    `<div><span class="sin-comp"></span>Sin competencia territorial</div>` +
+    `<div><span style="background:#1f2937;border-radius:50%"></span>Sede (distrito)</div>`;
+}
+
+// Qué mostrar en modo jueces bajo el cursor: sede (burbuja) o provincia
+function pickJueces(pt) {
+  const s = map.queryRenderedFeatures(pt, { layers: ['sedes-c'] })[0];
+  if (s) {
+    const sede = (J.sedes || []).find(x => x.id === s.properties.id);
+    if (sede) return { gid: sede.id, capa: 'tb_distrito', html: tooltipJuecesHTML(sede, esc(sede.nombre), esc(sede.departamento),
+      `<div class="bajo">Sede en el distrito · provincia ${esc(sede.provincia)}</div>`) };
+  }
+  const t = pick(pt);
+  if (!t) return null;
+  if (t.sin) return { gid: t.dist, capa: 'tb_distrito', sin: true, html: tooltipSinCompetencia(t) };
+  const prov = '8' + t.dist.slice(1, 5) + '00', p = J.provincias?.[prov], d = datos[prov] || {};
+  const pie = p ? '' : '<div class="bajo">Sin jueces registrados en dashboard.xlsx</div>';
+  return { gid: prov, capa: 'tb_provincia', html: tooltipJuecesHTML(p, esc(p?.nombre || d.nombprov || ''), esc(p?.departamento || d.nombregion || ''), pie) };
+}
+
+function verTodo() { map.fitBounds(AREA, { padding: 30, duration: 900 }); }
+
+// --- Lista de zonas ---
+const NIV = { DEPARTAMENTO: 0, PROVINCIA: 1, DISTRITO: 2 };
+function pintarTerritorio(terr) {
+  const cont = document.getElementById('lista');
+  const nom = g => (terr.nombres || {})[g] || Filtro.nombre(datos, g);
+  const n = g => (terr.cobertura?.[g] || []).length;
+  const deps = terr.departamentos || [];
+  let html = '';
+  for (const dep of deps) {
+    const provs = (terr.provincias || []).filter(g => g.slice(1, 3) === dep.slice(1, 3));
+    const dists = (terr.distritos || []).filter(g => g.slice(1, 3) === dep.slice(1, 3));
+    html += `<h4 class="grupo">${esc(Filtro.nombre(datos, dep))}</h4><ul>` +
+      provs.map(g => `<li data-id="${g}"><span class="niv n-PROVINCIA">PROV</span><span>${esc(nom(g))} <small>· completa · ${n(g)} órganos</small></span></li>`).join('') +
+      dists.map(g => `<li data-id="${g}"><span class="niv n-DISTRITO">DIST</span><span>${esc(nom(g))} <small>· ${esc(datos[g]?.nombprov || '')} · ${n(g)} órganos</small></span></li>`).join('') +
+      '</ul>';
+  }
+  cont.innerHTML = html + '<p class="nota">Sale de la columna "Competencia (Territorial)" de competencias.xlsx. ' +
+    'Una provincia nombrada se dibuja completa; si solo se nombran algunos distritos, solo esos.</p>';
+  cont.onclick = e => { const gid = e.target.closest('li[data-id]')?.dataset.id; if (gid) elegirZona(gid); };
+}
+function marcarLista(gid) {
+  document.querySelectorAll('#lista li').forEach(li => li.classList.toggle('activo', !!gid && li.dataset.id === gid));
+}
+
+// --- Tooltip y resaltado ---
+const tip = document.getElementById('tip');
+let hovered = null, current = null, lastPoint = null;
+function setHighlight(capa, id) {
+  if (hovered) map.setFeatureState({ source: 'base', ...hovered }, { hover: false });
+  hovered = capa ? { sourceLayer: capa, id } : null;
+  if (hovered) map.setFeatureState({ source: 'base', ...hovered }, { hover: true });
+}
+// Tooltip de un distrito sin competencia territorial de la Corte
+function tooltipSinCompetencia(t) {
+  const d = datos[t.dist] || {};
+  return `<h4>${esc(d.nombdist || '')}</h4><div class="amb">${esc(d.nombprov || '')} · ${esc(d.nombregion || '')}</div>
+    <div class="sep"></div><div class="sec">Sin competencia territorial</div>
+    <div style="color:#d1d5db;font-size:12.5px">La Corte Superior de Justicia de Junín no tiene competencia en este distrito
+    (según competencias.xlsx).</div>`;
+}
+function pick(pt) {
+  if (!map.getLayer('f-area')) return null;
+  const hit = map.queryRenderedFeatures(pt, { layers: ['f-area'] })[0];
+  if (!hit) return null;
+  const p = hit.properties;
+  const dist = String(p.id_geografia).split('.')[0];
+  const prov = '8' + pad(p.ccdd) + pad(p.ccpp) + '00';
+  const reg = '7' + pad(p.cod_region ?? p.ccdd) + '0000';
+  if (!visible(dist)) return { gid: dist, capa: 'tb_distrito', dist, prov, sin: true };
+  const gid = distIds.has(dist) ? dist : provIds.has(prov) ? prov : reg;
+  return { gid, capa: Filtro.CAPA[gid[0]], dist };
+}
+function place(pt) {
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight, c = map.getContainer();
+  let x = pt.x + pad, y = pt.y + pad;
+  if (x + w > c.clientWidth) x = pt.x - w - pad;
+  if (y + h > c.clientHeight) y = pt.y - h - pad;
+  x = Math.max(4, Math.min(x, c.clientWidth - w - 4));   // que no se salga del mapa
+  y = Math.max(4, Math.min(y, c.clientHeight - h - 4));
+  tip.style.transform = `translate(${x}px, ${y}px)`;
+}
+function clear() { tip.style.display = 'none'; setHighlight(null); current = null; map.getCanvas().style.cursor = ''; }
+function update(pt) {
+  if (modo === 'jueces') {
+    const j = pickJueces(pt);
+    if (!j) return clear();
+    map.getCanvas().style.cursor = 'pointer';
+    if ('j|' + j.gid !== current) {
+      current = 'j|' + j.gid;
+      setHighlight(j.capa, +j.gid);
+      tip.innerHTML = j.html; tip.style.display = 'block';
+    }
+    return place(pt);
+  }
+  const t = pick(pt);
+  if (!t) return clear();
+  map.getCanvas().style.cursor = 'pointer';
+  const key = t.gid + '|' + t.dist;
+  if (key !== current) {
+    current = key;
+    setHighlight(t.capa, +t.gid);
+    if (t.sin) { tip.innerHTML = tooltipSinCompetencia(t); tip.style.display = 'block'; return place(pt); }
+    const d = datos[t.gid];
+    const bajo = t.gid !== t.dist && datos[t.dist] ? `<div class="bajo">Distrito bajo el cursor: ${esc(datos[t.dist].nombdist)}</div>` : '';
+    if (d) { tip.innerHTML = tooltipHTML(d, bajo); tip.style.display = 'block'; } else tip.style.display = 'none';
+  }
+  if (tip.style.display === 'block') place(pt);
+}
+let pending = false;
+function schedule(pt) {
+  lastPoint = pt;
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; if (lastPoint) update(lastPoint); });
+}
+map.on('mousemove', e => schedule(e.point));
+map.on('mouseout', () => { lastPoint = null; clear(); });
+map.on('movestart', () => { if (!matchMedia('(hover: hover)').matches) clear(); });
+// Clic: acercarse a esa zona, poner los combos ahí y filtrar los gráficos
+map.on('click', e => {
+  const t = modo === 'jueces' ? pickJueces(e.point) : pick(e.point);
+  schedule(e.point);
+  if (t && !t.sin) elegirZona(t.gid);
+});
+</script>
+</body>
+</html>

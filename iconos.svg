@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <!-- Íconos del dashboard (24x24). Uso en HTML:  <svg class="ic"><use href="/iconos.svg#mazo"/></svg>
+       Toman el color del texto (currentColor). Para agregar uno, copia un <symbol> y cambia su id y su dibujo. -->
+  <defs>
+    <style>.t{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}</style>
+  </defs>
+
+  <!-- Institución -->
+  <symbol id="escala" viewBox="0 0 24 24"><g class="t">
+    <path d="M12 3v17M8 20h8M4 7h16M12 3v4"/>
+    <path d="M7 7l-3 6a3 3 0 0 0 6 0L7 7zM17 7l-3 6a3 3 0 0 0 6 0l-3-6z"/></g></symbol>
+  <symbol id="mazo" viewBox="0 0 24 24"><g class="t">
+    <path d="M13 4.5l6.5 6.5M10.5 7l6.5 6.5M12 5.5l-3 3 6.5 6.5 3-3z"/>
+    <path d="M11 11l-7.5 7.5 2 2L13 13M3 21h9"/></g></symbol>
+  <symbol id="edificio" viewBox="0 0 24 24"><g class="t">
+    <path d="M3 21h18M4 10h16M12 3l9 5H3l9-5z"/><path d="M6 10v8M10 10v8M14 10v8M18 10v8M4 18h16"/></g></symbol>
+  <symbol id="casa" viewBox="0 0 24 24"><g class="t">
+    <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></g></symbol>
+
+  <!-- Personas -->
+  <symbol id="hombre" viewBox="0 0 24 24"><g fill="currentColor">
+    <circle cx="12" cy="4.5" r="2.6"/>
+    <path d="M9 8.3h6a2 2 0 0 1 2 2V15a1 1 0 0 1-1 1h-1v5.2a.8.8 0 0 1-.8.8h-4.4a.8.8 0 0 1-.8-.8V16H8a1 1 0 0 1-1-1v-4.7a2 2 0 0 1 2-2z"/></g></symbol>
+  <symbol id="mujer" viewBox="0 0 24 24"><g fill="currentColor">
+    <circle cx="12" cy="4.5" r="2.6"/>
+    <path d="M10 8.3h4c.8 0 1.5.5 1.8 1.2l2.6 6.4a.8.8 0 0 1-.7 1.1H15v4.2a.8.8 0 0 1-.8.8h-4.4a.8.8 0 0 1-.8-.8V17H6.3a.8.8 0 0 1-.7-1.1l2.6-6.4c.3-.7 1-1.2 1.8-1.2z"/></g></symbol>
+  <symbol id="personas" viewBox="0 0 24 24"><g class="t">
+    <circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/>
+    <circle cx="17" cy="9" r="2.5"/><path d="M17 14c2.8 0 4.5 2 4.5 5"/></g></symbol>
+
+  <!-- Condición -->
+  <symbol id="titular" viewBox="0 0 24 24"><g class="t">
+    <path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></g></symbol>
+  <symbol id="supernumerario" viewBox="0 0 24 24"><g class="t">
+    <circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7M19 8v6M16 11h6"/></g></symbol>
+  <symbol id="provisional" viewBox="0 0 24 24"><g class="t">
+    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></g></symbol>
+
+  <!-- Pestañas -->
+  <symbol id="tendencia" viewBox="0 0 24 24"><g class="t">
+    <path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/><path d="M16 8h4v4"/></g></symbol>
+  <symbol id="carpeta" viewBox="0 0 24 24"><g class="t">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 10h18"/></g></symbol>
+  <symbol id="microfono" viewBox="0 0 24 24"><g class="t">
+    <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></g></symbol>
+
+  <!-- Interfaz -->
+  <symbol id="mapa" viewBox="0 0 24 24"><g class="t">
+    <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></g></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><g class="t">
+    <path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></g></symbol>
+  <symbol id="refrescar" viewBox="0 0 24 24"><g class="t">
+    <path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 3v5h5M4 13a8 8 0 0 0 14.3 4.9L20 16M20 21v-5h-5"/></g></symbol>
+  <symbol id="cerrar" viewBox="0 0 24 24"><g class="t"><path d="M6 6l12 12M18 6L6 18"/></g></symbol>
+  <symbol id="descarga" viewBox="0 0 24 24"><g class="t"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></g></symbol>
+  <symbol id="alerta" viewBox="0 0 24 24"><g class="t"><path d="M12 3.5l9.5 16.5h-19L12 3.5z"/><path d="M12 10v4.5M12 17.5v.01"/></g></symbol>
+  <symbol id="lista" viewBox="0 0 24 24"><g class="t">
+    <path d="M9 6h11M9 12h11M9 18h11M4.5 6v.01M4.5 12v.01M4.5 18v.01"/></g></symbol>
+  <symbol id="buscar" viewBox="0 0 24 24"><g class="t"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></g></symbol>
+  <symbol id="expandir" viewBox="0 0 24 24"><g class="t"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></g></symbol>
+  <symbol id="contraer" viewBox="0 0 24 24"><g class="t"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></g></symbol>
+  <symbol id="flecha" viewBox="0 0 24 24"><g class="t"><path d="M5 12h14M13 6l6 6-6 6"/></g></symbol>
+</svg>
