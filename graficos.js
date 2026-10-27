@@ -153,14 +153,17 @@
     const total = r => num(r.VARONES) + num(r.MUJERES);
     const provs = unicos(P.map(r => r.PROVINCIA));
     const pobDe = (p, a) => P.filter(r => r.PROVINCIA === p && r['AÑO'] === a).reduce((s, r) => s + total(r), 0);
+    // color fijo por provincia (orden por población del primer año): igual en ambos gráficos y en todos los años
+    const fijo = provs.slice().sort((a, b) => pobDe(b, anios[0]) - pobDe(a, anios[0]));
+    const colorDe = p => PALETA[fijo.indexOf(p) % PALETA.length];
     provs.sort((a, b) => pobDe(b, anio) - pobDe(a, anio));
 
     // Área apilada: población total proyectada por provincia
     grafico('c-pob-area', {
-      color: PALETA, tooltip: { trigger: 'axis', valueFormatter: fmt },
+      tooltip: { trigger: 'axis', valueFormatter: fmt },
       legend: leyenda(), grid: rejilla({ top: 58 }),
       xAxis: ejeCat(anios, { boundaryGap: false }), yAxis: ejeNum(),
-      series: provs.slice().reverse().map(p => ({ name: p, type: 'line', stack: 'pob', areaStyle: { opacity: 0.85 },
+      series: provs.slice().reverse().map(p => ({ name: p, type: 'line', stack: 'pob', color: colorDe(p), areaStyle: { opacity: 0.85 },
         symbol: 'none', lineStyle: { width: 1 }, data: anios.map(a => pobDe(p, a)) })),
     });
     // Barras: población por provincia en el año elegido
@@ -168,7 +171,7 @@
     grafico('c-pob-barras', {
       tooltip: { trigger: 'axis', valueFormatter: fmt }, grid: rejilla({ top: 8, right: 60 }),
       xAxis: ejeNum(), yAxis: ejeCat(asc),
-      series: [{ type: 'bar', barWidth: '62%', data: asc.map((p, i) => ({ value: pobDe(p, anio), itemStyle: { color: PALETA[(provs.length - 1 - i) % PALETA.length] } })),
+      series: [{ type: 'bar', barWidth: '62%', data: asc.map(p => ({ value: pobDe(p, anio), itemStyle: { color: colorDe(p) } })),
         label: { show: true, position: 'right', formatter: p => fmt(p.value), fontSize: 11 } }],
     });
     // Jueces por cada 100 mil habitantes
