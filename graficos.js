@@ -45,6 +45,7 @@
     const el = $(id);
     if (!el) return null;
     let c = charts[id];
+    if (c && c.getDom() !== el) { c.dispose(); c = null; }  // el contenedor se volvió a crear (ej. mini gráficos)
     if (!c) {
       c = charts[id] = echarts.init(el);
       if (alClic) c.on('click', alClic);
