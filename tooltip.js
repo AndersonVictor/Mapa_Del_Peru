@@ -1,9 +1,6 @@
-// =====================================================================================
-//  TOOLTIP: todo lo que se ve al pasar el mouse está en este archivo (ambos mapas lo usan).
-//  Después de editarlo, recarga la página (F5).
-// =====================================================================================
+// Tooltip de los mapas
 
-// 1) COLORES Y TAMAÑOS
+// colores
 const TOOLTIP_ESTILO = {
   fondo: 'rgba(58, 15, 24, .97)',   // vino oscuro (combina con el granate del encabezado)
   texto: '#ffffff',
@@ -14,25 +11,21 @@ const TOOLTIP_ESTILO = {
   ancho: '250px',                   // ancho mínimo
 };
 
-// 2) POBLACIÓN POR SEXO: [columna de datos.xlsx, texto]
+// por sexo: [columna, texto]
 const TOOLTIP_SEXO = {
   titulo: 'Población por sexo',
   hombres: ['hombre', 'Hombres'],
   mujeres: ['mujer', 'Mujeres'],
 };
 
-// 3) OTROS DATOS que van al final, uno debajo del otro: [columna de datos.xlsx, texto, unidad]
-//    Cambia el texto, el orden o borra una línea para ocultarla.
+// otros datos: [columna, texto, unidad]
 const TOOLTIP_FILAS = [
   ['densidad', 'Densidad de la población', ' hab/km²'],
 ];
 
-// 4) COLUMNAS NUEVAS: cualquier columna que agregues a datos.xlsx aparece sola al final,
-//    con su encabezado como texto. Para que NO salga alguna, ponla en esta lista.
+// columnas que no se muestran
 const TOOLTIP_OCULTAR = ['nivel'];
 
-// -------------------------------------------------------------------------------------
-// (De aquí para abajo no hace falta tocar nada.)
 const USADAS = ['id_geografia', 'nombregion', 'nombprov', 'nombdist', 'nombAmbito', 'indicador', 'dato'];
 const escT = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const vacioT = v => v === undefined || v === null || String(v).trim() === '';
@@ -40,7 +33,6 @@ const numT = v => +String(v ?? '').replace(/[^\d.-]/g, '') || 0;            // "
 const fmtT = n => Number(n).toLocaleString('es-PE').replace(/,/g, ' ');     // 1049999 -> "1 049 999"
 const pctT = (a, b) => b ? ` (${(a / b * 100).toFixed(1).replace('.', ',')}%)` : '';
 
-// Bloque "por sexo": dos filas con su porcentaje
 function bloqueSexo(titulo, hombres, mujeres, txtH = 'Hombres', txtM = 'Mujeres') {
   const t = hombres + mujeres;
   return `<div class="sec">${escT(titulo)}</div>
@@ -48,7 +40,7 @@ function bloqueSexo(titulo, hombres, mujeres, txtH = 'Hombres', txtM = 'Mujeres'
     <div class="row"><span style="color:${TOOLTIP_ESTILO.mujeres}">${txtM}</span><b>${fmtT(mujeres)}${pctT(mujeres, t)}</b></div>`;
 }
 
-// Tooltip de población (mapa general y mapa de trabajo en modo Población)
+// poblacion
 function tooltipHTML(d, pie = '') {
   const [cH, tH] = TOOLTIP_SEXO.hombres, [cM, tM] = TOOLTIP_SEXO.mujeres;
   const fijas = [cH, cM, ...TOOLTIP_FILAS.map(f => f[0])];
@@ -62,7 +54,7 @@ function tooltipHTML(d, pie = '') {
     extras.map(c => `<div class="sep"></div>` + dato(c, d[c])).join('') + pie;
 }
 
-// Tooltip de jueces (mapa de trabajo, modo Jueces). Mismo orden que la medida RESUMEN del Power BI.
+// jueces
 function tooltipJuecesHTML(j, titulo, departamento, pie = '') {
   const v = c => j?.[c] ?? 0;
   const punto = (color, texto, valor) => `<div class="row"><span><i class="punto" style="background:${color}"></i>${texto}</span><b>${valor}</b></div>`;

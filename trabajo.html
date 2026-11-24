@@ -16,7 +16,7 @@
   html, body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--texto); background: var(--fondo); }
   [hidden] { display: none !important; }
 
-  /* --- pantalla de carga (al abrir el dashboard) --- */
+  /* carga */
   #cargando { position: fixed; inset: 0; z-index: 100; background: var(--fondo); display: grid; place-items: center;
     transition: opacity .35s ease, visibility .35s ease; }
   #cargando.listo { opacity: 0; visibility: hidden; }
@@ -32,38 +32,47 @@
   #map-cargando .giro { width: 34px; height: 34px; border-width: 3px; }
   .ic { width: 18px; height: 18px; flex: none; }
 
-  /* --- encabezado --- */
+  /* encabezado */
   .cab { background: var(--granate); color: #fff; min-height: 92px;
     padding: 14px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .logo { width: 42px; height: 42px; border-radius: 12px; background: rgba(255,255,255,.12); display: grid; place-items: center; }
   .logo .ic { width: 24px; height: 24px; }
   .cab h1 { font-size: 19.5px; margin: 0; font-weight: 800; letter-spacing: -.01em; }
   .cab small { color: #f3d9dd; font-size: 13.5px; }
-  /* imagen del título (src/img/titulo.png): centrada en el encabezado */
   .cab { position: relative; }
   .titulo-img { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-height: 78px; max-width: calc(100% - 680px);
     object-fit: contain; pointer-events: none; }
-  /* logo de la institución; el filtro engrosa los trazos finos de las imágenes blancas */
   .cab-logo { flex: none; display: flex; align-items: center; }
   .logo-img { display: block; height: 52px; width: auto; }
-  .cab-texto { display: none; }   /* solo en el celular, en lugar del logo */
+  .cab-texto { display: none; }
   .titulo-img { filter: drop-shadow(0 0 .4px #fff); }
-  /* presidente y gestión, en amarillo a la derecha */
   .gestion { margin-left: auto; text-align: right; color: #fcd34d; font-size: 14px; line-height: 1.45; white-space: nowrap; }
   .gestion b { font-weight: 700; }
   .gestion .lema { font-style: italic; font-weight: 600; }
 
-  /* --- pestañas --- */
+  /* pestañas */
   .tabs { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid var(--borde);
-    display: flex; gap: 10px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
-  .tabs button { font: inherit; font-size: 15px; font-weight: 600; color: var(--suave); background: none; border: 0;
-    border-bottom: 3px solid transparent; padding: 13px 12px 11px; cursor: pointer; display: inline-flex; align-items: center;
-    gap: 7px; white-space: nowrap; transition: color .15s, border-color .15s; }
-  .tabs button:hover { color: var(--texto); }
-  .tabs button:first-child { margin-left: auto; } .tabs button:last-child { margin-right: auto; } /* centrado sin cortar */
-  .tabs button.on { color: var(--granate); border-bottom-color: var(--granate); }
+    display: flex; gap: 8px; padding: 10px 16px; overflow-x: auto; scrollbar-width: none; }
+  .tabs button { font: inherit; font-size: 14.5px; font-weight: 700; color: var(--granate); background: #fbf4f5;
+    border: 1px solid #ead3d8; border-radius: 999px; padding: 7px 14px; cursor: pointer; display: inline-flex; align-items: center;
+    gap: 7px; white-space: nowrap; transition: background .15s, color .15s; }
+  .tabs button:hover { background: #f3e2e6; }
+  .tabs button:first-child { margin-left: auto; }
+  .tabs button.on { color: #fff; background: var(--granate); border-color: var(--granate); }
+  /* boton gestion */
+  .tabs a.ga { font-size: 14.5px; font-weight: 700; color: #5e1220; background: #fcd34d; border: 1px solid #f0b90b; border-radius: 999px; padding: 7px 14px;
+    margin: 0 auto 0 6px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; text-decoration: none; align-self: center; }
+  .tabs a.ga:hover, .tabs a.ga:focus-visible { background: #f8c21f; }
+  .ga-mini { display: none; }
+  #ga-pop { position: fixed; z-index: 60; width: 300px; background: #fff; border: 1px solid var(--borde); border-top: 4px solid var(--granate);
+    border-radius: 14px; box-shadow: 0 12px 30px rgba(16,24,40,.16); padding: 12px 14px; font-size: 13px; color: var(--suave); }
+  #ga-pop b.t { display: block; color: var(--texto); font-size: 14px; margin-bottom: 8px; }
+  #ga-pop .f { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid #f1f2f5; }
+  #ga-pop .f b { color: var(--texto); font-size: 15px; }
+  #ga-pop .f b.obs { color: #b45309; }
+  #ga-pop small { display: block; margin-top: 8px; color: var(--tenue); }
 
-  /* --- tarjetas de indicadores --- */
+  /* tarjetas */
   .kpis { display: grid; grid-template-columns: 1.2fr repeat(5, 1fr); gap: 16px; padding: 20px 20px 6px; }
   .kpi { --c: var(--granate); --t: #f6e8ea; position: relative; overflow: hidden; background: var(--tarjeta);
     border: 1px solid var(--borde); border-top: 4px solid var(--c); border-radius: 16px; padding: 16px 18px 14px;
@@ -96,7 +105,7 @@
     border-radius: 999px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
   .activo button .ic { width: 13px; height: 13px; }
 
-  /* --- rejilla y tarjetas --- */
+  /* rejilla */
   main { padding: 16px 20px 28px; }
   .g { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
   .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; } .s6 { grid-column: span 6; }
@@ -108,13 +117,19 @@
   .ch { height: 270px; } .ch.alto { height: 340px; } .ch.bajo { height: 200px; }
   .sub2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
   .nota { color: var(--tenue); font-size: 12.5px; margin: 8px 0 0; }
+  .actualizado { display: flex; justify-content: flex-end; margin: 0 0 12px; }
+  .actualizado span { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
+    background: var(--granate); color: #fff; font-size: 13px; box-shadow: var(--sombra); }
+  .actualizado span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fcd34d; }
+  .pie { margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--borde); font-size: 12.5px; color: var(--suave); }
+  .pie b { color: var(--texto); }
   select, input[type=search] { font: inherit; font-size: 14.5px; padding: 7px 10px; border: 1px solid #d9dde5; border-radius: 10px; background: #fff; color: var(--texto); }
   input[type=search] { min-width: 220px; padding-left: 30px;
     background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E") no-repeat 9px center / 15px; }
   .seccion { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 16px; font-weight: 800; color: var(--texto); margin: 6px 0 -4px; }
   .seccion small { color: var(--suave); font-weight: 500; font-size: 13.5px; }
 
-  /* --- leyenda de donas (como el INEI) --- */
+  /* leyenda donas */
   .ley-dona { display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; margin-top: 4px; }
   .ley-dona div { min-width: 0; }
   .ley-dona .t { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--suave); font-weight: 600; }
@@ -123,7 +138,7 @@
   .ley-dona b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
   .ley-dona small { color: var(--tenue); font-size: 13px; font-weight: 600; }
 
-  /* --- mapa --- */
+  /* mapa */
   .barra-mapa { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
   #combos { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
   #combos .combo { min-width: 140px; }
@@ -138,7 +153,7 @@
     color: var(--suave); border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; }
   .modo button .ic { width: 14px; height: 14px; }
   .modo button.on { background: #fff; color: var(--granate); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-  /* --- mapa en pantalla completa: ocupa toda la pantalla y muestra el panel de resumen --- */
+  /* pantalla completa */
   #card-mapa.completa { position: fixed; inset: 0; z-index: 90; border-radius: 0; border: 0; margin: 0;
     display: flex; flex-direction: column; padding: 14px 20px 10px; }
   #card-mapa.completa #mapwrap { flex: 1; height: auto; min-height: 0; }
@@ -184,7 +199,7 @@
   h4.grupo { margin: 10px 0 4px; font-size: 12px; color: var(--tenue); text-transform: uppercase; letter-spacing: .05em; }
   .avisos div { margin-top: 4px; color: #92400e; }
 
-  /* --- tablas --- */
+  /* tablas */
   .tabla { max-height: 440px; overflow: auto; border: 1px solid var(--borde); border-radius: 12px; }
   table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
   th { position: sticky; top: 0; background: #f8f9fb; color: var(--suave); text-align: left; padding: 10px 12px; font-size: 12px;
@@ -195,13 +210,13 @@
   .chip { border-radius: 999px; padding: 2px 9px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
   .sexo { display: inline-flex; align-items: center; gap: 5px; } .sexo .ic { width: 15px; height: 15px; }
 
-  /* --- población: mini gráficos --- */
+  /* poblacion */
   #pob-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .mini { border: 1px solid var(--borde); border-radius: 12px; padding: 8px 10px 4px; }
   .mini-t { font-size: 13.5px; font-weight: 700; }
   .ch-mini { height: 120px; }
 
-  /* --- personal --- */
+  /* personal */
   .gran-total { background: var(--granate); color: #fff; border-radius: 16px;
     padding: 22px 26px; display: flex; align-items: center; gap: 18px; box-shadow: var(--sombra); }
   .gran-total .chip { width: 62px; height: 62px; border-radius: 16px; background: rgba(255,255,255,.14); display: grid; place-items: center; }
@@ -223,15 +238,15 @@
     #pob-mini { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 1200px) {
-    .tabs { flex-wrap: wrap; justify-content: center; gap: 2px 6px; }
-    .tabs button { padding: 11px 10px 9px; font-size: 14px; }
+    .tabs { flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .tabs button { padding: 6px 12px; font-size: 14px; }
     .tabs button:first-child, .tabs button:last-child { margin: 0; }
     .cab { flex-wrap: wrap; }
     .titulo-img { position: static; transform: none; order: 3; flex-basis: 100%; max-width: 100%; max-height: 60px; }
     .gestion { order: 2; }
   }
   @media (max-width: 700px) {
-    /* celular: todo centrado, uno debajo del otro: título, logo y presidente / gestión */
+    /* celular */
     .cab { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 16px 12px; min-height: 0; }
     .cab-logo { display: none; }
     .cab-texto { display: block; order: 0; font-size: 13.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
@@ -243,12 +258,14 @@
     .cab h1 { font-size: 16px; } .cab small { font-size: 12.5px; }
     .logo { width: 36px; height: 36px; border-radius: 10px; }
 
-    /* pestañas en el celular: todas a la vista, como botones en dos columnas */
     .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 16px; overflow: visible; }
     .tabs button { border: 1px solid var(--borde); border-radius: 10px; padding: 9px 10px; font-size: 13.5px;
       white-space: normal; text-align: left; line-height: 1.2; }
     .tabs button.on { background: var(--granate); color: #fff; border-color: var(--granate); }
     .tabs button:last-child:nth-child(odd) { grid-column: span 2; }
+    .tabs a.ga { grid-column: span 2; margin: 0; border-radius: 10px; padding: 9px 12px; flex-direction: column; align-items: flex-start; gap: 2px; white-space: normal; }
+    .ga-mini { display: block; font-size: 12px; font-weight: 500; color: #7a4a10; }
+    #ga-pop { display: none; }
     .tabs button:first-child, .tabs button:last-child { margin: 0; }
     .kpis { grid-template-columns: repeat(2, 1fr); padding: 14px 16px 0; gap: 10px; }
     .kpi { padding: 12px 14px; min-height: 0; } .kpi .chip { width: 32px; height: 32px; border-radius: 10px; }
@@ -297,6 +314,7 @@
   <button data-tab="cp"><svg class="ic"><use href="/iconos.svg#carpeta"/></svg>Carga procesal</button>
   <button data-tab="au"><svg class="ic"><use href="/iconos.svg#microfono"/></svg>Audiencias</button>
   <button data-tab="pe"><svg class="ic"><use href="/iconos.svg#personas"/></svg>Personal jurisdiccional</button>
+  <a class="ga" id="ga-link" href="/gestion"><span><svg class="ic"><use href="/iconos.svg#lista"/></svg> Gestión Administrativa</span><span class="ga-mini" id="ga-mini"></span></a>
 </nav>
 
 <section class="kpis">
@@ -348,19 +366,22 @@
 <main>
   <!-- 1) PROYECCIONES POBLACIONALES -->
   <section class="tab" id="tab-pob" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
     <div class="g">
-      <div class="card s6"><h3>Población total proyectada por provincia <small>2026 – 2031</small></h3><div class="ch alto" id="c-pob-area"></div></div>
-      <div class="card s3"><h3>Población por provincia <select id="pob-anio" aria-label="Año"></select></h3><div class="ch alto" id="c-pob-barras"></div></div>
+      <div class="card s5"><h3>Población total proyectada por provincia <small>2026 – 2031</small></h3><div class="ch alto" id="c-pob-area"></div></div>
+      <div class="card s4"><h3>Población por provincia <select id="pob-anio" aria-label="Año"></select></h3><div class="ch alto" id="c-pob-barras"></div></div>
       <div class="card s3"><h3>Jueces por 100 mil habitantes</h3><div class="ch alto" id="c-pob-100k"></div>
         <p class="nota">En granate: total de la Corte y referencia nacional.</p></div>
       <div class="card s12"><h3>Varones y mujeres por provincia
         <span class="leyenda" style="margin:0"><span style="background:#0056a1"></span>Varones <span style="background:#e8559a;margin-left:10px"></span>Mujeres</span></h3>
         <div id="pob-mini"></div></div>
     </div>
+    <footer class="pie"><b>Fuente:</b> INEI</footer>
   </section>
 
   <!-- 2) RESUMEN Y DETALLE POR PROVINCIA -->
   <section class="tab" id="tab-res" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
     <div class="g">
       <div class="card s7" id="card-mapa">
         <h3>Jueces y juezas en el territorio
@@ -378,7 +399,7 @@
           <div><span style="background:#a78bfa"></span>Distrito con competencia</div>
           <div><span class="sin-comp"></span>Sin competencia territorial</div>
         </div>
-        <details><summary><svg class="ic"><use href="/iconos.svg#lista"/></svg>Territorio de la Corte (competencias.xlsx)</summary>
+        <details><summary><svg class="ic"><use href="/iconos.svg#lista"/></svg>Territorio de la Corte</summary>
           <div id="lista"></div>
           <p class="nota"><a class="btn" href="/api/territorio.xlsx"><svg class="ic"><use href="/iconos.svg#descarga"/></svg>Descargar el territorio con datos del censo</a></p>
         </details>
@@ -401,10 +422,12 @@
           <tbody id="t-mag"></tbody></table></div>
       </div>
     </div>
+    <footer class="pie"><b>Fuente:</b> Base de datos institucional</footer>
   </section>
 
   <!-- 3) CARGA PROCESAL -->
   <section class="tab" id="tab-cp" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
     <div class="g">
       <div class="card s5"><h3>Carga procesal, ingresos y resueltos</h3><div class="ch alto" id="c-cp-anual"></div></div>
       <div class="card s4"><h3>Expedientes resueltos por especialidad</h3><div class="ch alto" id="c-cp-resueltos"></div></div>
@@ -415,11 +438,12 @@
       <div class="card s5"><h3>Órganos con sobrecarga <small>% sobre la carga máxima</small></h3><div class="ch" id="c-sobrecarga"></div></div>
     </div>
     <p class="nota">El último año puede ser parcial (datos hasta la fecha de corte).</p>
-    <p class="nota"> <b>Fuente:</b> Base de datos institucional | INEI</p>
+    <footer class="pie"><b>Fuente:</b> Base de datos institucional | INEI</footer>
   </section>
 
   <!-- 4) AUDIENCIAS -->
   <section class="tab" id="tab-au" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
     <div class="g">
       <div class="s12 seccion"><span>Nuevo Código Procesal Penal <small>· por sede</small></span>
         <label style="font-size:12.5px;font-weight:600;color:var(--suave)">Año de la tasa <select id="au-anio"></select></label></div>
@@ -434,10 +458,12 @@
       <div class="card s3"><h3>Tasa de atención <small id="t-snej-anio"></small></h3><div class="ch" id="c-snej-anio"></div></div>
     </div>
     <p class="nota">* Año parcial. Tasa de atención = atendidas (o realizadas) ÷ programadas.</p>
+    <footer class="pie"><b>Fuente:</b> Base de datos institucional</footer>
   </section>
 
   <!-- 5) PERSONAL JURISDICCIONAL -->
   <section class="tab" id="tab-pe" hidden>
+    <div class="actualizado"><span>Actualizado al <b>27/10/2026</b></span></div>
     <div class="g">
       <div class="s12 gran-total"><div class="chip"><svg class="ic"><use href="/iconos.svg#personas"/></svg></div>
         <div><b id="k-personal">–</b><span>Total personal jurisdiccional</span></div></div>
@@ -449,6 +475,7 @@
           <thead><tr><th>Cargo</th><th>D.L. 728</th><th>CAS</th><th>Ley 29277</th><th>D.L. 276</th><th>Total</th></tr></thead>
           <tbody id="t-pe"></tbody></table></div></div>
     </div>
+    <footer class="pie"><b>Fuente:</b> Base de datos institucional</footer>
   </section>
 </main>
 
@@ -462,15 +489,14 @@ function aviso(html) { const a = document.getElementById('aviso'); a.innerHTML =
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const pad = v => String(v ?? '').split('.')[0].padStart(2, '0');
 
-// --- Pestañas ---
+// pestañas
 let mapaVisto = false;
-// Tapa el mapa con el indicador de carga hasta que termine de dibujarse (así no aparece por partes)
 function cubrirMapa() {
   const c = document.getElementById('map-cargando');
   c.classList.remove('listo');
   map.once('idle', () => c.classList.add('listo'));
 }
-// Pide al servidor los tiles que cubren 'caja' en esos zooms; quedan en la caché del navegador
+// precarga de tiles
 function precargarTiles(caja, zooms) {
   const urls = [], mx = (caja[1][0] - caja[0][0]) * .6, my = (caja[1][1] - caja[0][1]) * .1;   // + margen de pantalla
   caja = [[caja[0][0] - mx, caja[0][1] - my], [caja[1][0] + mx, caja[1][1] + my]];
@@ -497,7 +523,7 @@ function mostrarTab(tab) {
 }
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => mostrarTab(b.dataset.tab));
 
-// --- Mapa (Junín y Huancavelica) ---
+// mapa
 let AREA = [[-76.9, -14.2], [-73.3, -10.5]];
 const map = new maplibregl.Map({
   container: 'map',
@@ -510,9 +536,7 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-ri
 let J = {}, modo = 'jueces';
 let datos = {}, regIds = new Set(), provIds = new Set(), distIds = new Set(), filtro = null;
 const fullRegs = new Set(), hidProv = new Set(), hidDist = new Set();
-// ¿Está en Junín / Huancavelica? (se dibuja; si no tiene competencia, en gris rayado)
 const enDeps = g => [...regIds].some(r => r.slice(1, 3) === g.slice(1, 3));
-// ¿Tiene competencia territorial? (provincia completa o distrito nombrado en competencias.xlsx)
 function visible(g) {
   const dep = [...fullRegs].some(r => r.slice(1, 3) === g.slice(1, 3));
   if (g[0] === '7') return regIds.has(g);
@@ -521,7 +545,6 @@ function visible(g) {
   return !hidDist.has(g) && !hidProv.has(prov) && (dep || provIds.has(prov) || distIds.has(g));
 }
 
-// Zona elegida (combos, clic en el mapa o en una barra) -> filtra tarjetas y gráficos
 function elegirZona(gid) {
   if (!filtro?.ir(gid)) { Filtro.marcar(map, gid); marcarLista(gid); Filtro.acercar(map, gid); filtrarTodo(gid, Filtro.nombre(datos, gid)); }
 }
@@ -529,7 +552,6 @@ function verToda() { filtro?.reiniciar(); marcarLista(null); clear(); verTodo();
 document.getElementById('todo').onclick = verToda;
 document.getElementById('quitar').onclick = verToda;
 
-// Los datos del dashboard llegan en paralelo al mapa: los gráficos no esperan a los tiles
 const pJueces = fetch('/api/jueces').then(r => r.json()).catch(() => ({}));
 const pDatos = fetch('/api/datos').then(r => r.json()).catch(() => ({}));
 const pTerritorio = fetch('/api/territorio').then(r => r.json()).catch(() => ({}));
@@ -540,7 +562,7 @@ Promise.all([pJueces, pDatos]).then(([j, d]) => {
   listoDatos = true;
   requestAnimationFrame(() => requestAnimationFrame(quitarCarga));
 });
-// Avisos: lo que no cuadra en dashboard.xlsx y los nombres de competencias.xlsx que no se reconocieron
+// avisos
 Promise.all([pJueces, pTerritorio]).then(([j, terr]) => {
   const av = [...(j.avisos || []), ...(terr.no_reconocido || []).map(a => 'competencias.xlsx: no se reconoció ' + a)];
   document.getElementById('avisos-box').hidden = !av.length;
@@ -548,10 +570,9 @@ Promise.all([pJueces, pTerritorio]).then(([j, terr]) => {
   document.getElementById('avisos').innerHTML = av.map(a => `<div>• ${esc(a)}</div>`).join('');
 });
 
-// Zona elegida -> tarjetas, gráficos y panel del mapa en pantalla completa
 function filtrarTodo(gid, nombre) { Dash.filtrar(gid, nombre); pintarInfoMapa(gid, nombre); }
 
-// --- Panel de resumen (se ve en pantalla completa) ---
+// panel de resumen
 let zonaActual = null, nombreZona = null;
 function pintarInfoMapa(gid, nombre) {
   zonaActual = gid || null; nombreZona = gid ? (nombre ?? nombreZona) : null;
@@ -563,7 +584,6 @@ function pintarInfoMapa(gid, nombre) {
   const pct = n => m.length ? ` <small>${f1(n / m.length * 100)}%</small>` : '';
   const fila = (color, txt, n, conPct) => `<div class="mi-f"><span><i style="background:${color}"></i>${txt}</span><b>${f1(n)}${conPct ? pct(n) : ''}</b></div>`;
   const inst = r => { const i = N(r.INSTANCIA); return i === 'SALA' || i === 'JPL' ? i : 'JESP'; };
-  // población: la zona elegida o la suma del territorio con competencia
   const pobDe = g => +String(datos[g]?.dato ?? '').replace(/[^\d]/g, '') || 0;
   const pob = gid ? pobDe(gid) : [...provIds, ...distIds].reduce((s, g) => s + pobDe(g), 0);
   const nivel = gid ? { 7: 'Departamento', 8: 'Provincia', 9: 'Distrito' }[gid[0]] : 'Toda la Corte';
@@ -590,7 +610,7 @@ function pintarInfoMapa(gid, nombre) {
     <div class="mi-nota">Elige una zona en los combos o haz clic en el mapa para ver su resumen.</div>`;
 }
 
-// --- Pantalla completa del mapa ---
+// pantalla completa
 const cardMapa = document.getElementById('card-mapa'), btnCompleta = document.getElementById('completa');
 function marcarCompleta(si) {
   cardMapa.classList.toggle('completa', si);
@@ -600,7 +620,6 @@ function marcarCompleta(si) {
   setTimeout(() => {
     cubrirMapa();
     map.resize();
-    // en computadora el panel va a la izquierda: el mapa se centra en el espacio que queda libre
     map.setPadding({ top: 0, right: 0, bottom: 0, left: si && innerWidth > 700 ? 330 : 0 });
     zonaActual ? Filtro.acercar(map, zonaActual) : map.fitBounds(AREA, { padding: 30, duration: 500 });
   }, 80);
@@ -617,7 +636,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && cardMapa.classList.contains('completa') && !document.fullscreenElement) marcarCompleta(false);
 });
 
-// --- Pantalla de carga: se va cuando los gráficos están listos (y el mapa, si se abre en su pestaña) ---
+// pantalla de carga
 let listoDatos = false, listoMapa = false;
 function quitarCarga(forzar) {
   const tab = document.querySelector('.tabs button.on')?.dataset.tab;
@@ -637,17 +656,15 @@ map.on('load', async () => {
     pJueces.then(j => { J = j; })
   ]);
   datos = d;
-  if (!Object.keys(datos).length) aviso('Falta <b>datos.xlsx</b>. Corre <code>python actualizar_excel.py</code>.');
+  if (!Object.keys(datos).length) aviso('Falta <b>datos.xlsx</b> junto a server.py.');
   if (!terr.provincias?.length && !terr.distritos?.length) aviso('Falta <b>competencias.xlsx</b> junto a server.py (o no tiene competencias).');
 
-  // Qué se dibuja: el territorio de competencias.xlsx (columna "Competencia (Territorial)").
-  // Provincias nombradas -> completas; distritos nombrados sueltos -> solo esos (ej. 3 de Churcampa).
+  // territorio con competencia (competencias.xlsx)
   (terr.departamentos || []).forEach(g => regIds.add(g));
   (terr.provincias || []).forEach(g => provIds.add(g));
   (terr.distritos || []).forEach(g => distIds.add(g));
   pintarTerritorio(terr);
 
-  // Expresiones sobre las propiedades del distrito en los tiles
   const ID = ['to-number', ['get', 'id_geografia']];
   const REG = ['to-number', ['coalesce', ['get', 'cod_region'], ['get', 'ccdd']]];
   const PROV = ['+', ['*', ['to-number', ['get', 'ccdd']], 100], ['to-number', ['get', 'ccpp']]];
@@ -671,7 +688,7 @@ map.on('load', async () => {
     'source-layer': layer, filter, paint: { 'line-color': color, 'line-width': w } });
 
   fill('f-area', 'tb_distrito', enDepsF, '#f4f1ea');
-  // Sin competencia territorial: gris con rayas diagonales
+  // sin competencia: gris rayado
   const c = document.createElement('canvas'); c.width = c.height = 16;
   const x = c.getContext('2d'); x.strokeStyle = 'rgba(100,116,139,.45)'; x.lineWidth = 1.5;
   x.beginPath(); x.moveTo(-4, 20); x.lineTo(20, -4); x.moveTo(-4, 4); x.lineTo(4, -4); x.moveTo(12, 20); x.lineTo(20, 12); x.stroke();
@@ -682,7 +699,7 @@ map.on('load', async () => {
     paint: { 'fill-pattern': 'rayas' } });
   fill('f-prov', 'tb_distrito', ['all', dentro, ['in', PROV, lit(provCod)]], '#fcd34d', 0.6);
   fill('f-dist', 'tb_distrito', ['all', dentro, ['in', ID, lit(num(distIds))]], '#a78bfa', 0.75);
-  // Jueces: provincias coloreadas por total de magistrados (dashboard.xlsx, hoja Magistrados)
+  // jueces por provincia
   const colores = ['match', PROV];
   for (const [gid, p] of Object.entries(J.provincias || {})) colores.push(+gid.slice(1, 5), colorJueces(p.total));
   fill('j-prov', 'tb_distrito', dentro, colores.length > 2 ? [...colores, '#f4f1ea'] : '#f4f1ea');
@@ -700,7 +717,7 @@ map.on('load', async () => {
   }
   Filtro.agregarSeleccion(map, 'inei');
 
-  // Jueces: una burbuja por sede (distrito), tamaño según cantidad
+  // burbujas por sede
   map.addSource('sedes', { type: 'geojson', data: { type: 'FeatureCollection',
     features: (J.sedes || []).filter(s => s.lon != null).map(s => ({ type: 'Feature', properties: { id: s.id, total: s.total },
       geometry: { type: 'Point', coordinates: [s.lon, s.lat] } })) } });
@@ -712,7 +729,7 @@ map.on('load', async () => {
   try { guardado = localStorage.getItem('modo'); } catch {}
   setModo(guardado === 'poblacion' ? 'poblacion' : 'jueces');
 
-  // Combos: lo de la lista que se ve (una provincia aparece también si tiene un distrito suelto visible, ej. Palca)
+  // combos
   const permitido = g => g[0] === '8'
     ? (visible(g) && provIds.has(g)) || [...distIds].some(x => visible(x) && x.slice(1, 5) === g.slice(1, 5))
     : visible(g) && (distIds.has(g) || provIds.has('8' + g.slice(1, 5) + '00'));
@@ -742,16 +759,14 @@ map.on('load', async () => {
     document.getElementById('map-cargando').classList.add('listo');
     quitarCarga();
   });
-  // Encuadre: el territorio con competencia (lo que te compete); se puede mover por todo Junín y Huancavelica
   const foco = cajaDe([...provIds, ...distIds]), deps = cajaDe([...regIds]);
   if (foco) AREA = foco;
   if (deps) map.setMaxBounds([[deps[0][0] - 2, deps[0][1] - 2], [deps[1][0] + 2, deps[1][1] + 2]]);
   map.fitBounds(AREA, { padding: 30, duration: 0 });
-  // Si el mapa aún no se ve (otra pestaña), se bajan sus tiles en segundo plano: al abrirlo sale de una vez
   if (document.getElementById('tab-res').hidden) precargarTiles(AREA, [6, 7, 8, 9]);
 });
 
-// --- Jueces en el mapa ---
+// jueces
 const ESCALA = [[50, '#8e1b2a'], [20, '#c0392b'], [10, '#e36b4f'], [5, '#f3a072'], [1, '#f9c9a4']];
 const colorJueces = n => (ESCALA.find(([min]) => n >= min) || [0, '#f4f1ea'])[1];
 
@@ -777,7 +792,6 @@ function pintarLeyendaJueces() {
     `<div><span style="background:#1f2937;border-radius:50%"></span>Sede (distrito)</div>`;
 }
 
-// Qué mostrar en modo jueces bajo el cursor: sede (burbuja) o provincia
 function pickJueces(pt) {
   const s = map.queryRenderedFeatures(pt, { layers: ['sedes-c'] })[0];
   if (s) {
@@ -789,13 +803,13 @@ function pickJueces(pt) {
   if (!t) return null;
   if (t.sin) return { gid: t.dist, capa: 'tb_distrito', sin: true, html: tooltipSinCompetencia(t) };
   const prov = '8' + t.dist.slice(1, 5) + '00', p = J.provincias?.[prov], d = datos[prov] || {};
-  const pie = p ? '' : '<div class="bajo">Sin jueces registrados en dashboard.xlsx</div>';
+  const pie = p ? '' : '<div class="bajo">Sin jueces registrados</div>';
   return { gid: prov, capa: 'tb_provincia', html: tooltipJuecesHTML(p, esc(p?.nombre || d.nombprov || ''), esc(p?.departamento || d.nombregion || ''), pie) };
 }
 
 function verTodo() { map.fitBounds(AREA, { padding: 30, duration: 900 }); }
 
-// --- Lista de zonas ---
+// lista de zonas
 const NIV = { DEPARTAMENTO: 0, PROVINCIA: 1, DISTRITO: 2 };
 function pintarTerritorio(terr) {
   const cont = document.getElementById('lista');
@@ -811,15 +825,14 @@ function pintarTerritorio(terr) {
       dists.map(g => `<li data-id="${g}"><span class="niv n-DISTRITO">DIST</span><span>${esc(nom(g))} <small>· ${esc(datos[g]?.nombprov || '')} · ${n(g)} órganos</small></span></li>`).join('') +
       '</ul>';
   }
-  cont.innerHTML = html + '<p class="nota">Sale de la columna "Competencia (Territorial)" de competencias.xlsx. ' +
-    'Una provincia nombrada se dibuja completa; si solo se nombran algunos distritos, solo esos.</p>';
+  cont.innerHTML = html + '<p class="nota">Según la competencia territorial de cada órgano jurisdiccional.</p>';
   cont.onclick = e => { const gid = e.target.closest('li[data-id]')?.dataset.id; if (gid) elegirZona(gid); };
 }
 function marcarLista(gid) {
   document.querySelectorAll('#lista li').forEach(li => li.classList.toggle('activo', !!gid && li.dataset.id === gid));
 }
 
-// --- Tooltip y resaltado ---
+// tooltip
 const tip = document.getElementById('tip');
 let hovered = null, current = null, lastPoint = null;
 function setHighlight(capa, id) {
@@ -827,13 +840,11 @@ function setHighlight(capa, id) {
   hovered = capa ? { sourceLayer: capa, id } : null;
   if (hovered) map.setFeatureState({ source: 'inei', ...hovered }, { hover: true });
 }
-// Tooltip de un distrito sin competencia territorial de la Corte
 function tooltipSinCompetencia(t) {
   const d = datos[t.dist] || {};
   return `<h4>${esc(d.nombdist || '')}</h4><div class="amb">${esc(d.nombprov || '')} · ${esc(d.nombregion || '')}</div>
     <div class="sep"></div><div class="sec">Sin competencia territorial</div>
-    <div style="color:#d1d5db;font-size:12.5px">La Corte Superior de Justicia de Junín no tiene competencia en este distrito
-    (según competencias.xlsx).</div>`;
+    <div style="color:#d1d5db;font-size:12.5px">La Corte Superior de Justicia de Junín no tiene competencia en este distrito.</div>`;
 }
 function pick(pt) {
   if (!map.getLayer('f-area')) return null;
@@ -849,10 +860,17 @@ function pick(pt) {
 }
 function place(pt) {
   const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight, c = map.getContainer();
-  let x = pt.x + pad, y = pt.y + pad;
-  if (x + w > c.clientWidth) x = pt.x - w - pad;
-  if (y + h > c.clientHeight) y = pt.y - h - pad;
-  x = Math.max(4, Math.min(x, c.clientWidth - w - 4));   // que no se salga del mapa
+  let x, y = pt.y - h / 2;
+  // tooltip a la izquierda del mapa
+  const info = cardMapa.classList.contains('completa') && innerWidth > 700 ? document.getElementById('map-info') : null;
+  const izq = info ? info.offsetLeft + info.offsetWidth + 12 : 12;
+  if (c.clientWidth > 700 && pt.x > izq + w + pad) x = izq;
+  else {
+    x = pt.x + pad; y = pt.y + pad;
+    if (x + w > c.clientWidth) x = pt.x - w - pad;
+    if (y + h > c.clientHeight) y = pt.y - h - pad;
+  }
+  x = Math.max(4, Math.min(x, c.clientWidth - w - 4));
   y = Math.max(4, Math.min(y, c.clientHeight - h - 4));
   tip.style.transform = `translate(${x}px, ${y}px)`;
 }
@@ -893,12 +911,41 @@ function schedule(pt) {
 map.on('mousemove', e => schedule(e.point));
 map.on('mouseout', () => { lastPoint = null; clear(); });
 map.on('movestart', () => { if (!matchMedia('(hover: hover)').matches) clear(); });
-// Clic: acercarse a esa zona, poner los combos ahí y filtrar los gráficos
 map.on('click', e => {
   const t = modo === 'jueces' ? pickJueces(e.point) : pick(e.point);
   schedule(e.point);
   if (t && !t.sin) elegirZona(t.gid);
 });
+</script>
+<script>
+// boton de gestion administrativa
+(function () {
+  const link = document.getElementById('ga-link');
+  const f = n => n == null ? '–' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 1 }).replace(/,/g, ' ').replace('.', ',');
+  const fecha = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '–';
+  let pop = null;
+  addEventListener('load', () => setTimeout(() => fetch('/api/gestion/resumen').then(r => r.json()).then(r => {
+    const e = r.ejecucion;
+    const ejec = e ? `${f(e.pct)}%` : '–';
+    document.getElementById('ga-mini').textContent = `Ejecución ${ejec} · ${f(r.obras)} obras · ${f(r.equipos)} equipos` + (r.por_validar != null ? ` · ${f(r.por_validar)} por validar` : '');
+    pop = document.createElement('div');
+    pop.id = 'ga-pop'; pop.hidden = true;
+    pop.innerHTML = `<b class="t">Gestión Administrativa</b>
+      <div class="f"><span>Ejecución presupuestal ${e ? e.anio + (e.parcial ? ' (parcial)' : '') : ''}</span><b>${ejec}</b></div>
+      <div class="f"><span>Obras de infraestructura</span><b>${f(r.obras)}</b></div>
+      <div class="f"><span>Equipos entregados</span><b>${f(r.equipos)}</b></div>
+      ${r.por_validar != null ? `<div class="f"><span>Cifras por validar</span><b class="obs">${f(r.por_validar)}</b></div>` : ''}
+      <small>Último corte: ${fecha(r.ultimo_corte)} · clic para abrir</small>`;
+    document.body.appendChild(pop);
+  }).catch(() => {}), 600));
+  const ver = on => {
+    if (!pop) return;
+    pop.hidden = !on;
+    if (on) { const b = link.getBoundingClientRect(); pop.style.top = (b.bottom + 8) + 'px'; pop.style.left = Math.max(8, Math.min(b.right - 300, innerWidth - 308)) + 'px'; }
+  };
+  link.addEventListener('mouseenter', () => ver(true)); link.addEventListener('mouseleave', () => ver(false));
+  link.addEventListener('focus', () => ver(true)); link.addEventListener('blur', () => ver(false));
+})();
 </script>
 </body>
 </html>

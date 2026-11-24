@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestión Administrativa CSJ Junín</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f1d2d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v17M8 20h8M4 7h16'/%3E%3Cpath d='M7 7l-3 6a3 3 0 0 0 6 0L7 7zM17 7l-3 6a3 3 0 0 0 6 0l-3-6z'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --granate: #7f1d2d; --azul: #0056a1; --fondo: #f3f4f7; --tarjeta: #ffffff;
+    --borde: #e7e9ef; --texto: #111827; --suave: #6b7280; --tenue: #9ca3af; --ambar: #b45309;
+    --sombra: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--texto); background: var(--fondo); }
+  [hidden] { display: none !important; }
+  .ic { width: 18px; height: 18px; flex: none; }
+
+  #cargando { position: fixed; inset: 0; z-index: 100; background: var(--fondo); display: grid; place-items: center;
+    transition: opacity .35s ease, visibility .35s ease; }
+  #cargando.listo { opacity: 0; visibility: hidden; }
+  .caja-carga { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .caja-carga b { font-size: 17px; color: var(--granate); }
+  .caja-carga small { font-size: 13px; color: var(--suave); }
+  .giro { width: 46px; height: 46px; border-radius: 50%; border: 4px solid #ead3d7; border-top-color: var(--granate);
+    animation: girar .8s linear infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  /* encabezado */
+  .cab { position: relative; background: var(--granate); color: #fff; min-height: 92px; padding: 14px 20px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .cab-logo { flex: none; display: flex; align-items: center; }
+  .logo-img { display: block; height: 52px; width: auto; }
+  .cab-texto { display: none; }
+  .titulo-ga { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+  .titulo-ga b { display: block; font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
+  .titulo-ga small { color: #f3d9dd; font-size: 13.5px; }
+  .gestion { margin-left: auto; text-align: right; color: #fcd34d; font-size: 14px; line-height: 1.45; white-space: nowrap; }
+  .gestion .lema { font-style: italic; font-weight: 600; }
+
+  /* pestañas */
+  .tabs { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid var(--borde);
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 10px 16px; align-items: center; }
+  .tabs button, .tabs a { font: inherit; font-size: 14px; font-weight: 700; color: var(--granate); background: #fbf4f5;
+    border: 1px solid #ead3d8; border-radius: 999px; padding: 6px 13px; cursor: pointer; display: inline-flex; align-items: center;
+    gap: 7px; white-space: nowrap; text-decoration: none; transition: background .15s, color .15s; }
+  .tabs button:hover { background: #f3e2e6; }
+  .tabs button.on { color: #fff; background: var(--granate); border-color: var(--granate); }
+  .tabs .volver { color: #5e1220; background: #fcd34d; border: 1px solid #f0b90b; border-radius: 999px; padding: 6px 14px; margin-right: 8px; }
+  .tabs .volver:hover { background: #f8c21f; }
+  .tabs .badge { background: #fef3c7; color: var(--ambar); border-radius: 999px; font-size: 11.5px; padding: 1px 7px; }
+
+  main { padding: 16px 20px 28px; }
+  .barra-sup { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+  .barra-sup h2 { margin: 0; font-size: 19px; font-weight: 800; }
+  .barra-sup p { margin: 2px 0 0; color: var(--suave); font-size: 13.5px; }
+  .actualizado { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px;
+    background: var(--granate); color: #fff; font-size: 13px; box-shadow: var(--sombra); }
+  .actualizado::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fcd34d; }
+
+  .g { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+  .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; } .s6 { grid-column: span 6; }
+  .s7 { grid-column: span 7; } .s8 { grid-column: span 8; } .s12 { grid-column: span 12; }
+  .card { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 16px; padding: 16px 18px; min-width: 0; box-shadow: var(--sombra); }
+  .card h3 { margin: 0 0 4px; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 10px;
+    justify-content: space-between; flex-wrap: wrap; }
+  .card h3 small { color: var(--tenue); font-weight: 500; font-size: 13px; }
+  .corte { font-size: 12.5px; color: var(--suave); margin: 0 0 8px; }
+  .ch { height: 280px; } .ch.alto { height: 340px; } .ch.bajo { height: 220px; }
+  .card.llena { display: flex; flex-direction: column; } .card.llena .ch { flex: 1; min-height: 280px; }
+  .nota { color: var(--suave); font-size: 12.5px; margin: 8px 0 0; line-height: 1.45; }
+  .pie { margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--borde); font-size: 12.5px; color: var(--suave); }
+  .pie b { color: var(--texto); }
+
+  /* tarjetas */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+  .kpi { --c: var(--granate); --t: #f6e8ea; position: relative; background: var(--tarjeta); border: 1px solid var(--borde);
+    border-top: 4px solid var(--c); border-radius: 16px; padding: 14px 16px 12px; display: flex; flex-direction: column;
+    box-shadow: var(--sombra); min-width: 0; }
+  .kpi { overflow: hidden; }
+  .kpi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .kpi-ico { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; background: var(--t); color: var(--c); }
+  .kpi-ico .ic { width: 21px; height: 21px; }
+  .kpi-fondo { position: absolute; right: -14px; bottom: -16px; width: 92px; height: 92px; color: var(--c); opacity: .07; pointer-events: none; }
+  .kpi > :not(.kpi-fondo) { position: relative; }
+  .mini { display: flex; gap: 2px; height: 8px; border-radius: 99px; overflow: hidden; margin: 10px 0 6px; background: var(--t); }
+  .mini i { display: block; min-width: 4px; }
+  .mini-ley { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--suave); }
+  .mini-ley span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .mini-ley i { width: 8px; height: 8px; border-radius: 2px; } .mini-ley b { color: var(--texto); }
+  .m2 { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; margin-top: 8px; font-size: 11.5px; color: var(--suave); }
+  .m2 .mini { margin: 0; } .m2 b { color: var(--texto); }
+  .kpi-lbl { font-size: 12px; font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .05em; }
+  .kpi > b { font-size: 31px; font-weight: 800; line-height: 1.1; letter-spacing: -.02em; margin: 8px 0 4px; }
+  .kpi > b small { font-size: 15px; font-weight: 700; color: var(--suave); letter-spacing: 0; }
+  .kpi .det { font-size: 13px; color: var(--suave); }
+  .kpi .det strong { color: var(--c); }
+  .kpi .cte { font-size: 11.5px; color: var(--tenue); margin-top: 6px; }
+  .kpi-bar { height: 6px; border-radius: 99px; background: var(--t); overflow: hidden; margin: 4px 0 2px; }
+  .kpi-bar i { display: block; height: 100%; background: var(--c); border-radius: 99px; }
+  .obs { display: inline-flex; align-items: center; gap: 4px; background: #fef3c7; color: var(--ambar); border: 1px solid #fde68a;
+    border-radius: 999px; font-size: 11.5px; font-weight: 700; padding: 1px 8px; white-space: nowrap; }
+  .parc { display: inline-flex; background: #e8f1fa; color: var(--azul); border-radius: 999px; font-size: 11.5px; font-weight: 700;
+    padding: 1px 8px; white-space: nowrap; }
+
+  /* evolucion */
+  .cmp { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .cmp li { padding: 10px 12px; border-radius: 12px; background: #fafbfd; border: 1px solid var(--borde); }
+  .cmp-tit { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .cmp-tit b { font-size: 19px; white-space: nowrap; } .cmp-tit .sube { color: #15803d; } .cmp-tit .baja { color: var(--granate); }
+  .cmp-bar { position: relative; height: 22px; margin-top: 4px; border-radius: 6px; background: #f1f3f7; overflow: hidden; }
+  .cmp-bar i { position: absolute; inset: 0 auto 0 0; background: #cbd5e1; border-radius: 6px; }
+  .cmp-bar.ahora i { background: var(--granate); }
+  .cmp-bar small { position: relative; display: block; padding: 0 8px; line-height: 22px; font-size: 12px; font-weight: 600; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmp-bar.ahora small { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+  .cmp li p { margin: 6px 0 0; font-size: 12.5px; color: var(--suave); }
+  .cmp-ley { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--granate); vertical-align: -1px; }
+  .cmp-ley.antes { background: #cbd5e1; }
+
+  /* tablas */
+  .tabla { max-height: 480px; overflow: auto; border: 1px solid var(--borde); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th { position: sticky; top: 0; background: #f8f9fb; color: var(--suave); text-align: center; vertical-align: middle; padding: 10px 12px; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--borde); z-index: 1; }
+  td { padding: 8px 12px; border-bottom: 1px solid #f1f2f5; vertical-align: middle; text-align: center; }
+  td small { color: var(--tenue); display: block; } td.n { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.vacio { text-align: center; color: var(--tenue); padding: 18px; }
+  tbody tr:hover td { background: #fafbfd; }
+  .chip { border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; background: #eef0f4; color: #374151; }
+  .chip.verde { background: #e7f6ec; color: #15803d; } .chip.ambar { background: #fef3c7; color: var(--ambar); }
+  .chip.rojo { background: #fde8ea; color: #b91c1c; } .chip.azul { background: #e8f1fa; color: var(--azul); }
+
+  .filtros { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  select, input[type=search] { font: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid #d9dde5; border-radius: 10px; background: #fff; color: var(--texto); }
+  input[type=search] { min-width: 260px; flex: 1; }
+  .contador { color: var(--suave); font-size: 13px; margin-left: auto; }
+  #avisos { margin: 0 0 14px; background: #fff7e6; color: #7a4b00; border: 1px solid #f3d38b; border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }
+  #avisos ul { margin: 6px 0 0; padding-left: 18px; }
+
+  @media (max-width: 1150px) {
+    .s3, .s4, .s5 { grid-column: span 6; } .s6, .s7, .s8 { grid-column: span 12; }
+    .titulo-ga { position: static; transform: none; order: 3; flex-basis: 100%; }
+  }
+  @media (max-width: 700px) {
+    .cab { flex-direction: column; align-items: center; gap: 8px; padding: 14px 16px 12px; min-height: 0; }
+    .cab-logo { display: none; }
+    .cab-texto { display: block; font-size: 13.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; text-align: center; }
+    .titulo-ga b { font-size: 20px; }
+    .gestion { order: 3; align-self: stretch; margin: 2px 0 0; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.18);
+      text-align: center; font-size: 12.5px; white-space: normal; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 16px; overflow: visible; }
+    .tabs button, .tabs a { border: 1px solid var(--borde); border-radius: 10px; padding: 9px 10px; font-size: 13.5px; white-space: normal;
+      text-align: left; line-height: 1.2; }
+    .tabs button.on { background: var(--granate); color: #fff; border-color: var(--granate); }
+    .tabs .volver { grid-column: span 2; justify-content: center; margin: 0; border-radius: 10px; }
+    main { padding: 12px 16px 24px; }
+    .s3, .s4, .s5, .s6 { grid-column: span 12; }
+    .kpis { grid-template-columns: 1fr 1fr; gap: 10px; } .kpi > b { font-size: 24px; }
+    input[type=search] { min-width: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div id="cargando" role="status" aria-live="polite">
+  <div class="caja-carga"><div class="giro"></div><b>Cargando Gestión Administrativa</b><small>Preparando indicadores…</small></div>
+</div>
+<header class="cab">
+  <div class="cab-logo"><img class="logo-img" src="/src/img/logo_cab.png" alt="Corte Superior de Justicia de Junín"></div>
+  <div class="cab-texto">Corte Superior de Justicia de Junín</div>
+  <div class="titulo-ga"><b>Gestión Administrativa</b><small>Periodos 2025 y 2026</small></div>
+  <div class="gestion">
+    <div><b>Presidente:</b> Dr. Ricardo Corrales Melgarejo</div>
+    <div><b>Gestión:</b> 2025-2026</div>
+    <div class="lema">Justicia pronta, honesta e inclusiva.</div>
+  </div>
+</header>
+<nav class="tabs">
+  <a class="volver" href="/">← Volver al dashboard</a>
+  <button data-tab="res">Resumen</button>
+  <button data-tab="pre">Presupuesto y recaudación</button>
+  <button data-tab="pro">Producción y justicia de paz</button>
+  <button data-tab="cum">Cumplimiento</button>
+  <button data-tab="equ">Equipamiento y patrimonio</button>
+  <button data-tab="inf">Infraestructura</button>
+  <button data-tab="int">Intervenciones y convenios</button>
+  <button data-tab="val">Cifras por validar <span class="badge" id="n-val"></span></button>
+</nav>
+
+<main>
+  <div id="avisos" hidden></div>
+
+  <!-- 1) RESUMEN -->
+  <section class="tab" id="tab-res" hidden>
+    <div class="barra-sup"><div><h2>Lo más importante</h2><p>Cada cifra indica su fecha de corte. <span class="parc">parcial</span> = año incompleto<span id="ley-obs" hidden> · <span class="obs">⚠ por validar</span> = cifra observada</span>.</p></div>
+      <span class="actualizado">Último corte: <b class="ult-corte">–</b></span></div>
+    <div class="kpis" id="res-kpis"></div>
+    <div class="g" style="margin-top:16px">
+      <div class="card s7 llena"><h3>Ejecución presupuestal por año <small>devengado / PIM</small></h3><p class="corte" id="res-ppto-corte"></p><div class="ch" id="c-res-ppto"></div></div>
+      <div class="card s5"><h3>Evolución de indicadores <small>2023–2026</small></h3><p class="corte">2023–2024 <span class="cmp-ley antes"></span> · 2025–2026 <span class="cmp-ley"></span></p>
+        <ul class="cmp" id="res-cmp"></ul></div>
+      <div class="card s4"><h3>Recaudación propia <small>S/</small></h3><p class="corte" id="res-rec-corte"></p><div class="ch bajo" id="c-res-rec"></div></div>
+      <div class="card s4"><h3>Equipos entregados por año</h3><p class="corte" id="res-eq-corte"></p><div class="ch bajo" id="c-res-eq"></div></div>
+      <div class="card s4"><h3>Obras de infraestructura por estado</h3><p class="corte" id="res-ob-corte"></p><div class="ch bajo" id="c-res-ob"></div></div>
+    </div>
+  </section>
+
+  <!-- 2) PRESUPUESTO Y RECAUDACIÓN -->
+  <section class="tab" id="tab-pre" hidden>
+    <div class="barra-sup"><div><h2>Presupuesto y recaudación</h2><p>Avance del gasto (Planes y Presupuesto) y recaudación propia (SECOM y Archivo).</p></div>
+      <span class="actualizado">Último corte: <b class="ult-corte">–</b></span></div>
+    <div class="g">
+      <div class="card s12"><h3>PIA, PIM y devengado por año</h3>
+        <div class="tabla"><table><thead><tr><th>Año</th><th>Corte</th><th>PIA</th><th>PIM</th><th>Variación PIM/PIA</th><th>Devengado</th><th>% ejecución</th><th>Saldo por ejecutar</th><th>Puesto entre UE</th></tr></thead>
+          <tbody id="t-ppto"></tbody></table></div></div>
+      <div class="card s6"><h3>PIM y devengado <small>S/</small></h3><p class="corte" id="pre-ppto-corte"></p><div class="ch" id="c-ppto"></div></div>
+      <div class="card s6"><h3>PIA vs. PIM por genérica de gasto</h3><p class="corte" id="pre-gen-corte"></p><div class="ch" id="c-genericas"></div></div>
+      <div class="card s6"><h3>Recaudación de multas judiciales <small>S/</small></h3><p class="corte" id="pre-mul-corte"></p><div class="ch" id="c-multas"></div>
+        <p class="nota" id="pre-mul-nota"></p></div>
+      <div class="card s6"><h3>Servicios archivísticos</h3><p class="corte" id="pre-arc-corte"></p><div class="ch" id="c-archivo"></div>
+        <p class="nota" id="pre-arc-nota"></p></div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> Planes y Presupuesto, SECOM, Archivo Desconcentrado</footer>
+  </section>
+
+  <!-- 3) PRODUCCIÓN Y JUSTICIA DE PAZ -->
+  <section class="tab" id="tab-pro" hidden>
+    <div class="barra-sup"><div><h2>Producción y justicia de paz</h2><p>Lo que reportan las oficinas administrativas: jornadas extraordinarias, descarga, capacitación y supervisión. La producción del SIJ por órgano está en el dashboard.</p></div>
+      <span class="actualizado">Último corte: <b class="ult-corte">–</b></span></div>
+    <div class="kpis" id="pro-kpis"></div>
+    <div class="g" style="margin-top:16px">
+      <div class="card s4"><h3>Actos procesales en jornadas extraordinarias</h3><p class="corte" id="pro-jor-corte"></p><div class="ch" id="c-jornadas"></div></div>
+      <div class="card s4"><h3>Expedientes remitidos y devueltos al archivo</h3><p class="corte" id="pro-exp-corte"></p><div class="ch" id="c-expedientes"></div></div>
+      <div class="card s4"><h3>Capacitaciones SIJ y servidores capacitados</h3><p class="corte" id="pro-sij-corte"></p><div class="ch" id="c-sij"></div></div>
+      <div class="card s6"><h3>Jueces de paz: capacitaciones por tipo</h3><p class="corte" id="pro-jp-corte"></p><div class="ch" id="c-jp-cap"></div></div>
+      <div class="card s6"><h3>Jueces de paz: YACHAY 2.0 y visitas administrativas</h3><p class="corte" id="pro-yv-corte"></p><div class="ch" id="c-jp-yachay"></div></div>
+      <div class="card s12"><h3>Registros RCBP y RENAVINA <small>2023 – 2026</small></h3><p class="corte" id="pro-reg-corte"></p><div class="ch" id="c-registros"></div></div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> Estadística, UDAJUP, REDIJU, Módulo de Violencia</footer>
+  </section>
+
+  <!-- 4) CUMPLIMIENTO -->
+  <section class="tab" id="tab-cum" hidden>
+    <div class="barra-sup"><div><h2>Cumplimiento</h2><p>Avance frente a normas y metas.</p></div>
+      <span class="actualizado">Último corte: <b class="ult-corte">–</b></span></div>
+    <div class="g">
+      <div class="card s7"><h3>Modelo de Integridad: avance por corte <small>% de cumplimiento</small></h3><p class="corte" id="cum-int-corte"></p><div class="ch alto" id="c-integridad"></div></div>
+      <div class="card s5"><h3>Brechas NICSP</h3><p class="corte" id="cum-nic-corte"></p><div class="ch" id="c-nicsp"></div><p class="nota" id="cum-nic-nota"></p></div>
+      <div class="s12"><div class="kpis" id="cum-kpis"></div></div>
+      <div class="card s6"><h3>Exámenes médico ocupacionales <small>trabajadores evaluados</small></h3><p class="corte" id="cum-emo-corte"></p><div class="ch bajo" id="c-emo"></div></div>
+      <div class="card s6"><h3>Personal de seguridad</h3><p class="corte" id="cum-seg-corte"></p><div id="cum-seg"></div></div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> Integridad, Contabilidad, SST, Seguridad</footer>
+  </section>
+
+  <!-- 5) EQUIPAMIENTO Y PATRIMONIO -->
+  <section class="tab" id="tab-equ" hidden>
+    <div class="barra-sup"><div><h2>Equipamiento y patrimonio</h2><p>Inversiones IOARR, equipos entregados y movimientos de bienes.</p></div>
+      <span class="actualizado">Último corte: <b class="ult-corte">–</b></span></div>
+    <div class="g">
+      <div class="card s12"><h3>Inversiones IOARR</h3>
+        <div class="tabla"><table><thead><tr><th>CUI</th><th>Inversión</th><th>Viabilidad</th><th>Costo aprobado</th><th>Costo actualizado</th><th>Devengado acumulado</th><th>% avance</th><th>Estado</th><th>Corte</th></tr></thead>
+          <tbody id="t-ioarr"></tbody></table></div><p class="nota">% de avance = devengado acumulado / costo actualizado × 100.</p></div>
+      <div class="card s6"><h3>Equipos entregados por tipo</h3><p class="corte" id="equ-tipo-corte"></p><div class="ch alto" id="c-eq-tipo"></div></div>
+      <div class="card s6"><h3>Equipos entregados por destino</h3><p class="corte"></p><div class="ch alto" id="c-eq-destino"></div></div>
+      <div class="card s5"><h3>Movimientos de bienes patrimoniales</h3><p class="corte">Cantidad de bienes por acción y año</p><div class="ch" id="c-patrimonio"></div></div>
+      <div class="card s7"><h3>Detalle de movimientos</h3>
+        <div class="tabla" style="max-height:300px"><table><thead><tr><th>Año</th><th>Acción</th><th>Cantidad</th><th>Resolución</th><th>Destinatario</th></tr></thead>
+          <tbody id="t-patrimonio"></tbody></table></div></div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> Estudios y Proyectos, Informática, Control Patrimonial</footer>
+  </section>
+
+  <!-- 6) INFRAESTRUCTURA -->
+  <section class="tab" id="tab-inf" hidden>
+    <div class="barra-sup"><div><h2>Infraestructura</h2><p>Obras por sede, con su documento de sustento.</p></div>
+      <span class="actualizado">Último corte: <b class="ult-corte">–</b></span></div>
+    <div class="kpis" id="inf-kpis"></div>
+    <div class="g" style="margin-top:16px">
+      <div class="card s7"><h3>Obras por sede y tipo</h3><div class="ch alto" id="c-obras-sede"></div></div>
+      <div class="card s5"><h3>m² antes y después</h3><div class="ch alto" id="c-m2"></div></div>
+      <div class="card s12"><h3>Detalle de obras</h3>
+        <div class="tabla"><table><thead><tr><th>Sede</th><th>Año</th><th>Obra</th><th>Tipo</th><th>m² ganados</th><th>Estado</th><th>Documento</th><th>Conformidad</th></tr></thead>
+          <tbody id="t-obras"></tbody></table></div></div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> Coordinación de Infraestructura y administradores de MBJ</footer>
+  </section>
+
+  <!-- 7) INTERVENCIONES Y CONVENIOS -->
+  <section class="tab" id="tab-int" hidden>
+    <div class="barra-sup"><div><h2>Intervenciones y convenios</h2><p>Todo lo realizado, consultable por eje, oficina y periodo.</p></div>
+      <span class="actualizado">Último corte: <b class="ult-corte">–</b></span></div>
+    <div class="g">
+      <div class="card s5"><h3>Intervenciones por eje</h3><div class="ch alto" id="c-ejes"></div></div>
+      <div class="card s7"><h3>Convenios y adendas <small id="conv-alerta"></small></h3>
+        <div class="tabla" style="max-height:340px"><table><thead><tr><th>Entidad</th><th>Instrumento</th><th>Vence</th><th>Situación</th></tr></thead>
+          <tbody id="t-convenios"></tbody></table></div></div>
+      <div class="card s12"><h3>Buscador de intervenciones</h3>
+        <div class="filtros">
+          <input type="search" id="int-q" placeholder="Buscar en título, brecha, solución o sustento…" aria-label="Buscar">
+          <select id="int-eje" aria-label="Eje"><option value="">Todos los ejes</option></select>
+          <select id="int-of" aria-label="Oficina"><option value="">Todas las oficinas</option></select>
+          <select id="int-anio" aria-label="Año"><option value="">Todos los años</option></select>
+          <span class="contador" id="int-n"></span>
+        </div>
+        <div class="tabla"><table><thead><tr><th>Año</th><th>Eje</th><th>Oficina</th><th>Intervención</th><th>Estado</th><th>Sustento</th></tr></thead>
+          <tbody id="t-interv"></tbody></table></div></div>
+    </div>
+    <footer class="pie"><b>Fuente:</b> Estudios y Proyectos</footer>
+  </section>
+
+  <!-- 8) CIFRAS POR VALIDAR -->
+  <section class="tab" id="tab-val" hidden>
+    <div class="barra-sup"><div><h2>Cifras por validar</h2><p>Control de calidad: datos observados, oficina responsable y estado. UPD actualiza el estado en la hoja VALIDACIONES.</p></div>
+      <span class="actualizado">Último corte: <b class="ult-corte">–</b></span></div>
+    <div class="kpis" id="val-kpis"></div>
+    <div class="card" style="margin-top:16px"><div class="tabla" style="max-height:none"><table><thead><tr><th>Id</th><th>Tema</th><th>Qué dice el informe</th><th>Observación</th><th>Oficina</th><th>Hoja / registro</th><th>Estado</th></tr></thead>
+      <tbody id="t-val"></tbody></table></div></div>
+    <footer class="pie"><b>Fuente:</b> Gerencia de Administración Distrital / UPD</footer>
+  </section>
+</main>
+
+<script src="/vendor/echarts.min.js"></script>
+<script src="/gestion.js"></script>
+</body>
+</html>

@@ -1,5 +1,4 @@
-// Combos Departamento -> Provincia -> Distrito, compartidos por el mapa general y el de trabajo.
-// Los nombres salen de datos.xlsx (/api/datos) y la extensión de cada zona de /api/extensiones.
+// Combos departamento / provincia / distrito
 (function () {
   const COLOR_COMBO = '#0056a1'; // color del combo elegido y de la opción marcada
   const N = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
@@ -10,7 +9,6 @@
   let ext = null; // se pide una sola vez, recién cuando hace falta
   const extensiones = () => ext || (ext = fetch('/api/extensiones').then(r => r.json()).catch(() => { ext = null; return {}; }));
 
-  // Acerca el mapa a la zona. Devuelve false si no se conoce su extensión.
   async function acercar(map, gid) {
     const b = (await extensiones())[gid];
     if (!b) return false;
@@ -18,7 +16,7 @@
     return true;
   }
 
-  // Contorno azul de la zona elegida en el combo (una capa por nivel)
+  // contorno de la zona elegida
   const NADA = ['boolean', false];
   function agregarSeleccion(map, source) {
     for (const capa of Object.values(CAPA))
@@ -31,7 +29,7 @@
         ? ['==', ['to-number', ['get', 'id_geografia']], +gid] : NADA);
   }
 
-  // --- Nombres sobre el mapa (etiquetas HTML: no necesitan fuentes descargadas) ---
+  // nombres sobre el mapa
   const css = document.createElement('style');
   css.textContent = `
     .etq { pointer-events: none !important; white-space: nowrap; font: 600 12px system-ui, sans-serif; color: #1f2937;
@@ -41,8 +39,7 @@
     .etq.prov { font-size: 12px; }
     .etq.apagada { color: #9ca3af; font-weight: 500; }
     .etq.dest { color: #0b63ce; font-size: 13px; font-weight: 800; }
-    /* combos (estilo INEI): botón + lista desplegable con círculos de selección.
-       COLOR_COMBO es el color de lo elegido: cámbialo aquí. */
+    /* combos */
     .combo { --c: ${COLOR_COMBO}; position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
     .combo > span { font: 600 11.5px system-ui, sans-serif; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
     .combo select { display: none; }
@@ -74,7 +71,7 @@
 
   function crearEtiquetas(map) {
     let marcas = [], turno = 0;
-    // Oculta las que se tapan entre sí: primero la elegida, luego las zonas más grandes
+    // si se tapan, gana la mas grande
     const acomodar = () => {
       const puestos = [];
       for (const m of marcas) {
@@ -92,13 +89,11 @@
       marcas.forEach(m => m.marker.remove());
       marcas = ids.filter(g => ext[g]).map(g => {
         const e = ext[g];
-        // centro del polígono; si el servidor aún no lo calculó, el centro de la caja
         const punto = e.length >= 6 ? [e[4], e[5]] : [(e[0] + e[2]) / 2, (e[1] + e[3]) / 2];
         const el = document.createElement('div');
         el.className = 'etq ' + ({ 7: 'dep', 8: 'prov', 9: 'dist' }[g[0]]) + (g === destacado ? ' dest' : apagado(g) ? ' apagada' : '');
         el.textContent = nombreDe(g);
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(punto).addTo(map);
-        // los nombres apagados (sin competencia) ceden su lugar a los demás
         const base = e[6] ?? (e[2] - e[0]) * (e[3] - e[1]);
         return { el, marker, prioridad: g === destacado ? Infinity : apagado(g) ? base / 1e6 : base };
       }).sort((a, b) => b.prioridad - a.prioridad);
@@ -106,9 +101,7 @@
     };
   }
 
-  // opciones: { map, contenedor, datos, area (Set de ids de departamento o null), permitido(gid): qué sale en los combos,
-  //             rotulable(gid): qué zonas pueden llevar nombre, etiquetasIniciales(): ids con nombre sin elegir nada,
-  //             alElegir(gid|null) }
+  // opciones: map, contenedor, datos, area, permitido, rotulable, etiquetasIniciales, alElegir
   function crear({ map, contenedor, datos, area = null, permitido = () => true, rotulable = () => true,
                    etiquetasIniciales = null, apagado = () => false, alElegir }) {
     const ids = Object.keys(datos);
@@ -120,8 +113,6 @@
       (g.slice(1, 5) === p.slice(1, 5) ||
        (N(datos[g].nombprov) === N(datos[p].nombprov) && N(datos[g].nombregion) === N(datos[p].nombregion)))).sort(orden);
 
-    // Nombres en el mapa: departamento elegido -> sus provincias; provincia elegida -> sus distritos.
-    // Se muestran todas (no solo las de la lista) para ubicarse mejor.
     const todas = { provDe: r => ids.filter(g => g[0] === '8' && g.slice(1, 3) === r.slice(1, 3)),
                     distDe: p => ids.filter(g => g[0] === '9' && g.slice(1, 5) === p.slice(1, 5)) };
     const ponerEtiquetas = crearEtiquetas(map);
@@ -135,7 +126,6 @@
     };
 
     contenedor.innerHTML = '';
-    // Cada combo: un <select> oculto que guarda el valor (y dispara 'change'), un botón y una lista
     const flecha = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>';
     const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const combo = (titulo, texto) => {
@@ -178,13 +168,11 @@
       caja.addEventListener('keydown', e => { if (e.key === 'Escape') { cerrar(); btn.focus(); } });
       return s;
     };
-    // un clic fuera cierra cualquier lista abierta
     if (!window.__combosCierre) {
       window.__combosCierre = true;
       document.addEventListener('click', e => { if (!e.target.closest('.combo')) document.querySelectorAll('.combo.abierto').forEach(c => c.classList.remove('abierto')); });
     }
     const sDep = combo('Departamento', 'Todos'), sProv = combo('Provincia', 'Todas'), sDist = combo('Distrito', 'Todos');
-    // texto del botón y color de "elegido" según el valor de cada combo
     const pintar = () => [sDep, sProv, sDist].forEach(s => s.refrescar());
     sDep.llenar(deps); sProv.llenar([]); sDist.llenar([]);
 
@@ -202,7 +190,6 @@
     etiquetar();
     return {
       reiniciar() { sDep.value = ''; sProv.llenar([]); sDist.llenar([]); marcar(map, null); etiquetar(); pintar(); },
-      // Pone los combos en una zona (p. ej. al hacer clic en la lista del mapa de trabajo)
       ir(gid) {
         const dep = gid[0] === '7' ? gid : deps.find(r => (gid[0] === '8' ? provDe(r) : provDe(r).flatMap(distDe)).includes(gid));
         if (!dep) return false;

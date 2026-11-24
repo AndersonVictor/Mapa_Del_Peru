@@ -1,13 +1,6 @@
-"""Territorio de la Corte leído de competencias.xlsx (columna 'Competencia (Territorial)').
+"""Territorio de la Corte segun competencias.xlsx.
 
-Cada texto se interpreta así:
-  - "PROVINCIA(S) DE A, B Y C"            -> provincias completas
-  - "DISTRITO(S) DE X, Y Y Z"             -> solo esos distritos
-  - "(PROVINCIA DE ...)", "DEPARTAMENTO DE ...", "EXCEPCIÓN ...", "DISTRITO JUDICIAL ..." -> se ignoran
-  - Alias: LA OROYA = provincia Yauli, PAMPAS = provincia Tayacaja, CAJAS = San Agustín (de Cajas)
-  - Errores de tipeo (CHICHIHUASI, PUNCO, YROBLE...) se corrigen con el nombre más parecido.
-Un distrito se busca primero en la provincia de la sede del órgano, luego en las provincias del mismo
-texto y por último en Junín / Huancavelica.
+PROVINCIA(S) DE ... -> provincias completas, DISTRITO(S) DE ... -> solo esos distritos.
 """
 import difflib
 import re
@@ -17,6 +10,8 @@ from collections import defaultdict
 DEPARTAMENTOS = ("JUNIN", "HUANCAVELICA")
 ALIAS_PROVINCIA = {"LA OROYA": "YAULI", "PAMPAS": "TAYACAJA"}
 ALIAS_DISTRITO = {"CAJAS": "SAN AGUSTIN"}
+# distritos que no ve la Corte aunque su provincia figure completa
+EXCLUIDOS = ("MONOBAMBA",)
 
 
 def norm(s):
@@ -27,11 +22,10 @@ def norm(s):
 
 
 class Geo:
-    """Provincias y distritos de Junín y Huancavelica (de datos.xlsx)."""
 
     def __init__(self, datos):
-        self.prov = {}                      # nombre -> id
-        self.dist = defaultdict(list)       # nombre -> [(id, id_provincia)]
+        self.prov = {}
+        self.dist = defaultdict(list)
         self.nombre = {}
         for gid, d in datos.items():
             if norm(d.get("nombregion")) not in DEPARTAMENTOS:
@@ -59,7 +53,7 @@ class Geo:
         cand = self.dist.get(nombre) or self.dist.get(self.parecido(nombre, self.dist) or "", [])
         if not cand:
             return None
-        for p in preferidas:                # primero en la provincia de la sede o del mismo texto
+        for p in preferidas:
             for gid, prov in cand:
                 if prov == p:
                     return gid
@@ -67,17 +61,14 @@ class Geo:
 
 
 def partes(texto):
-    """Texto -> trozos con su modo ('prov' o 'dist')."""
-    # mayúsculas y sin tildes, pero conservando comas, puntos y guiones (separan los nombres)
     t = unicodedata.normalize("NFD", str(texto)).upper()
     t = "".join(c for c in t if unicodedata.category(c) != "Mn")
     t = re.sub(r"\s+", " ", t)
-    # "(PROVINCIA DE CHURCAMPA)" y "DE LA PROVINCIA DE TAYACAJA" solo aclaran dónde están los distritos
     for m in re.finditer(r"(?:\(\s*|DE LA )PROVINCIA DE ([A-Z ]+)", t):
         yield "ctx", norm(m.group(1))
     t = re.sub(r"\([^)]*\)", " ", t)
     t = re.sub(r"\bDE LA PROVINCIA DE [A-Z ]+", " ", t)
-    t = re.sub(r"(EN TODO EL )?\bDISTRITOS? JUDICIAL(ES)?\b.*", " ", t)   # distritos judiciales: no es geografía
+    t = re.sub(r"(EN TODO EL )?\bDISTRITOS? JUDICIAL(ES)?\b.*", " ", t)
     t = re.sub(r"[^A-Z0-9 ,.;-]", " ", t)
     t = re.sub(r"\bEXCEPCION\b.*", " ", t)
     t = re.sub(r"\bDEPARTAMENTO DE [A-Z]+", " ", t)
@@ -86,7 +77,7 @@ def partes(texto):
         trozo = norm(trozo)
         if not trozo or "JUDICIAL" in trozo:
             continue
-        while True:                                            # quita y recuerda palabras guía
+        while True:
             m = re.match(r"^(Y |LOS |LAS |EN TODO EL |DE )", trozo)
             if m:
                 trozo = trozo[m.end():]
@@ -102,7 +93,7 @@ def partes(texto):
 
 
 def desglosar(trozos, geo, preferidas):
-    """Si un trozo no es un nombre conocido, prueba partirlo: 'TINTAY PUNCU YROBLE' -> 'TINTAY PUNCU' + 'ROBLE'."""
+    """Ej: TINTAY PUNCU YROBLE -> TINTAY PUNCU + ROBLE"""
     conocido = lambda n: geo.provincia(n) or geo.distrito(n, preferidas)
     for modo, nombre in trozos:
         if conocido(nombre):
@@ -121,8 +112,6 @@ def desglosar(trozos, geo, preferidas):
 
 
 def territorio(ruta, datos):
-    """{'provincias': [...], 'distritos': [...], 'departamentos': [...], 'cobertura': {id: [dependencias]},
-        'no_reconocido': [...], 'nombres': {id: nombre}}"""
     from openpyxl import load_workbook
     geo = Geo(datos)
     ws = load_workbook(ruta, read_only=True, data_only=True).worksheets[0]
@@ -138,7 +127,6 @@ def territorio(ruta, datos):
         dependencia = str(f[i_dep] or "").strip() if i_dep is not None else ""
         sede = geo.provincia(norm(f[i_prov])) if i_prov is not None else None
         trozos = list(partes(texto))
-        # provincias nombradas en el mismo texto o como aclaración: ayudan a ubicar distritos repetidos
         en_texto = [p for m, n in trozos if m in ("prov", "ctx") for p in [geo.provincia(n)] if p]
         trozos = [(m, n) for m, n in trozos if m != "ctx"]
         for modo, nombre in desglosar(trozos, geo, [p for p in [sede, *en_texto] if p]):
@@ -155,7 +143,19 @@ def territorio(ruta, datos):
                 cobertura[gid].append(dependencia)
             else:
                 raros.append(f"'{nombre.title()}' en: {dependencia}")
-    # un distrito dentro de una provincia completa no hace falta listarlo aparte
+    for nombre in EXCLUIDOS:
+        d = geo.distrito(norm(nombre), [])
+        if not d:
+            continue
+        p = "8" + d[1:5] + "00"
+        if p in provs:
+            provs.discard(p)
+            for g, pp in (x for v in geo.dist.values() for x in v):
+                if pp == p and g != d:
+                    dists.add(g)
+                    cobertura[g] += cobertura[p]
+        dists.discard(d)
+        cobertura.pop(d, None)
     sueltos = sorted(d for d in dists if "8" + d[1:5] + "00" not in provs)
     deps = sorted({"7" + g[1:3] + "0000" for g in provs | set(sueltos)})
     return {"provincias": sorted(provs), "distritos": sueltos, "departamentos": deps,

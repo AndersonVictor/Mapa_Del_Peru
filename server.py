@@ -1,88 +1,25 @@
-"""Servidor 100% local: sirve el mapa desde cache_tiles/ y los textos desde datos.xlsx.
-NO consulta al INEI mientras navegas.  Uso:  python server.py  ->  http://localhost:8000
-
-Antes, una sola vez, descarga todo con:  python descargar_todo.py
-Las funciones de descarga (token, fetch_tile, fetch_tooltip) solo las usan los scripts
-descargar_todo.py y actualizar_excel.py.
-"""
-import io, json, math, re, threading, time, urllib.parse, urllib.request, urllib.error
+"""Servidor del dashboard. python server.py -> http://localhost:8000"""
+import io, json, math, re, threading, urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 PORT = 8000
 EXCEL = ROOT / "datos.xlsx"
-COMPETENCIAS = ROOT / "competencias.xlsx"  # competencia territorial de cada órgano: define qué se dibuja
-JUECES = ROOT / "dashboard.xlsx"     # dashboard CSJ Junín: Magistrados, Organos, Poblacion, Carga_Procesal...
-TILE_DIR = ROOT / "cache_tiles"
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/155.0.0.0 Safari/537.36"
-SITE = "https://censos2025.inei.gob.pe"
-TILES = ("https://geoservercpv2025.inei.gob.pe/geoserver/gwc/service/tms/1.0.0/"
-         "cpv_resultados_v2:limites_administrativos_v2@EPSG%3A900913@pbf/{z}/{x}/{y}.pbf")
-# Columnas del Excel = campos que devuelve el tooltip del INEI
+COMPETENCIAS = ROOT / "competencias.xlsx"
+JUECES = ROOT / "dashboard.xlsx"
+GESTION = ROOT / "gestion_administrativa.xlsx"
+TILE_DIR = ROOT / "tiles"
 COLUMNAS = ["id_geografia", "nombregion", "nombprov", "nombdist", "nombAmbito",
             "indicador", "dato", "hombre", "mujer", "densidad"]
 
-_tok = {"v": None, "exp": 0}
-_lock = threading.Lock()
 _tile_cache = {}
-_tip_cache = {}
 _excel = {"mtime": None, "json": b"{}", "datos": {}}
 _excel_lock = threading.Lock()
 
 
-def get(url, headers=None, timeout=30):
-    req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
-
-
-def token(force=False):
-    with _lock:
-        if force or not _tok["v"] or time.time() > _tok["exp"]:
-            raw = get(SITE + "/api/v1/geo/token", {"Referer": SITE + "/", "Accept": "application/json"})
-            _tok["v"] = json.loads(raw)["data"]["token"]
-            _tok["exp"] = time.time() + 240
-        return _tok["v"]
-
-
-def fetch_tile(z, x, y):
-    """Tile del INEI, guardado en memoria y en disco (cache_tiles/) para no volver a pedirlo."""
-    key = (z, x, y)
-    if key in _tile_cache:
-        return _tile_cache[key]
-    path = TILE_DIR / str(z) / str(x) / f"{y}.pbf"
-    if path.exists():
-        data = _tile_cache[key] = path.read_bytes()
-        return data
-    url = TILES.format(z=z, x=x, y=y)
-    for attempt in (0, 1):
-        try:
-            data = get(url, {"geomatica_key_dinamic": token(force=attempt == 1), "Referer": SITE + "/"})
-            break
-        except urllib.error.HTTPError as e:
-            if e.code == 404:  # fuera del área con datos (p. ej. al norte del ecuador): tile vacío
-                data = b""
-                break
-            if e.code not in (401, 403) or attempt:
-                raise
-    _tile_cache[key] = data
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return data
-
-
-def fetch_tooltip(gid, ind=1, year=2025):
-    key = (gid, ind, year)
-    if key not in _tip_cache:
-        url = f"{SITE}/api/v1/resultados/tooltip?idIndicador={ind}&idTiempo={year}&idGeografia={gid}"
-        _tip_cache[key] = get(url, {"Referer": SITE + "/resultados/poblacion-total/dashboard",
-                                    "Accept": "application/json"})
-    return _tip_cache[key]
-
-
 def excel_json():
-    """datos.xlsx como JSON {id_geografia: {campo: valor}}. Se relee solo si el archivo cambió."""
+    """datos.xlsx como JSON."""
     with _excel_lock:
         mtime = EXCEL.stat().st_mtime if EXCEL.exists() else None
         if mtime != _excel["mtime"]:
@@ -105,7 +42,7 @@ def excel_json():
 
 
 def tile_local(z, x, y):
-    """Tile desde memoria o disco. Nunca va al INEI: si no está descargado devuelve None."""
+    """Tile local o None."""
     key = (z, x, y)
     if key not in _tile_cache:
         path = TILE_DIR / str(z) / str(x) / f"{y}.pbf"
@@ -116,7 +53,7 @@ def tile_local(z, x, y):
 
 
 def precargar_tiles():
-    """Lee todos los tiles de cache_tiles/ a memoria al arrancar: el mapa sale más rápido."""
+    """Carga los tiles a memoria."""
     n = 0
     for f in TILE_DIR.rglob("*.pbf"):
         try:
@@ -135,7 +72,6 @@ def zoom_maximo():
 
 
 def resumen_tiles():
-    """Cuántos tiles hay en disco y cuántos tienen datos (los vacíos son zonas fuera de Perú)."""
     total = con_datos = 0
     if TILE_DIR.exists():
         for f in TILE_DIR.rglob("*.pbf"):
@@ -144,16 +80,14 @@ def resumen_tiles():
     return total, con_datos
 
 
-# --- Extensión (caja oeste, sur, este, norte) de cada zona, para acercarse desde los combos ---
+# extension de cada zona
 EXT_FILE = TILE_DIR / "extensiones.json"
 _ext = {"json": None}
 _ext_lock = threading.Lock()
 
 
 def extensiones():
-    """{id_geografia: [o, s, e, n, lon, lat, área]} de departamentos, provincias y distritos.
-    lon/lat = centro del polígono (ahí va su nombre en el mapa).
-    Se calcula una vez desde los tiles (unos segundos) y se guarda en cache_tiles/extensiones.json."""
+    """{id: [o, s, e, n, lon, lat, area]}, se guarda en tiles/extensiones.json."""
     with _ext_lock:
         if _ext["json"] is not None:
             return _ext["json"]
@@ -163,10 +97,10 @@ def extensiones():
             if guardado.get("zoom") == z and guardado.get("v") == 2:
                 _ext["json"] = json.dumps(guardado["cajas"]).encode()
                 return _ext["json"]
-        from actualizar_excel import cajas, tiles_peru, txt
+        from geo import cajas, tiles_area, txt
         print(f"Calculando la extensión de cada zona (zoom {z}), solo esta vez...")
         res, mom = {}, {}
-        for (tz, x, y) in tiles_peru(z):
+        for (tz, x, y) in tiles_area(z):
             data = tile_local(tz, x, y)
             if not data:
                 continue
@@ -184,7 +118,7 @@ def extensiones():
                     m[0] += a; m[1] += ax; m[2] += ay
         for gid, c in res.items():
             a, ax, ay = mom[gid]
-            if a:  # centro ponderado por área, de vuelta a lon/lat
+            if a:
                 lon = ax / a * 360 - 180
                 lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * ay / a))))
             else:
@@ -203,7 +137,6 @@ _jueces_lock = threading.Lock()
 
 
 def jueces_json():
-    """Resumen de jueces (jueces.py). Se recalcula solo si cambia jueces.xlsx o datos.xlsx."""
     with _jueces_lock:
         excel_json()
         clave = (JUECES.stat().st_mtime if JUECES.exists() else None, _excel["mtime"])
@@ -223,7 +156,6 @@ _terr_lock = threading.Lock()
 
 
 def territorio_datos():
-    """Territorio de la Corte (territorio.py). Se recalcula si cambia competencias.xlsx o datos.xlsx."""
     with _terr_lock:
         excel_json()
         clave = (COMPETENCIAS.stat().st_mtime if COMPETENCIAS.exists() else None, _excel["mtime"])
@@ -240,8 +172,27 @@ def territorio_datos():
         return _terr["datos"]
 
 
+_gestion = {"mtime": None, "datos": None}
+_gestion_lock = threading.Lock()
+
+
+def gestion_datos():
+    with _gestion_lock:
+        mtime = GESTION.stat().st_mtime if GESTION.exists() else None
+        if mtime != _gestion["mtime"] or _gestion["datos"] is None:
+            if mtime is None:
+                res = {"hojas": {}, "ultimos": {}, "resumen": {}, "avisos": [
+                    "Falta gestion_administrativa.xlsx junto a server.py. Créalo con:  python crear_gestion.py"]}
+            else:
+                import gestion
+                res = gestion.datos(GESTION)
+                print(f"gestion_administrativa.xlsx cargado: {len(res['ultimos'])} indicadores, "
+                      f"{len(res['avisos'])} avisos")
+            _gestion.update(mtime=mtime, datos=res)
+        return _gestion["datos"]
+
+
 def territorio_xlsx():
-    """El territorio de la Corte con los datos del censo de cada zona."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     t, datos = territorio_datos(), _excel["datos"]
@@ -272,21 +223,22 @@ ESTATICOS = {"/vendor/maplibre-gl.js": "application/javascript",
              "/vendor/maplibre-gl.css": "text/css",
              "/vendor/echarts.min.js": "application/javascript",
              "/graficos.js": "application/javascript; charset=utf-8",
+             "/gestion.js": "application/javascript; charset=utf-8",
              "/iconos.svg": "image/svg+xml",
              "/filtro.js": "application/javascript; charset=utf-8",
              "/tooltip.js": "application/javascript; charset=utf-8"}
 
 
 def pagina(nombre):
-    """HTML con ?v=<fecha> en filtro.js y tooltip.js: si cambian, el navegador baja la versión nueva."""
+    """HTML con ?v= en los js para no usar cache viejo."""
     html = (ROOT / nombre).read_text(encoding="utf-8")
-    for js in ("filtro.js", "tooltip.js", "graficos.js"):
+    for js in ("filtro.js", "tooltip.js", "graficos.js", "gestion.js"):
         html = html.replace(f'src="/{js}"', f'src="/{js}?v={int((ROOT / js).stat().st_mtime)}"')
     return html.encode("utf-8")
 
 
 class H(BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"  # mantiene la conexión abierta entre tiles
+    protocol_version = "HTTP/1.1"
 
     def send(self, code, body, ctype, extra=None):
         self.send_response(code)
@@ -303,10 +255,10 @@ class H(BaseHTTPRequestHandler):
             m = re.match(r"/tiles/(\d+)/(\d+)/(\d+)\.pbf", p)
             if m:
                 data = tile_local(*map(int, m.groups()))
-                if not data:  # fuera de Perú o no descargado: tile vacío
+                if not data:
                     return self.send(204, b"", "application/x-protobuf")
                 extra = {"Cache-Control": "public, max-age=86400"}
-                if data[:2] == b"\x1f\x8b":  # tile comprimido: que el navegador lo descomprima
+                if data[:2] == b"\x1f\x8b":  # gzip
                     extra["Content-Encoding"] = "gzip"
                 return self.send(200, data, "application/x-protobuf", extra)
             if p.startswith("/api/config"):
@@ -321,6 +273,12 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, extensiones(), "application/json")
             if p.startswith("/api/jueces"):
                 return self.send(200, jueces_json(), "application/json; charset=utf-8", {"Cache-Control": "no-store"})
+            if p.startswith("/api/gestion/resumen"):
+                return self.send(200, json.dumps(gestion_datos()["resumen"], ensure_ascii=False).encode(),
+                                 "application/json; charset=utf-8", {"Cache-Control": "no-store"})
+            if p.startswith("/api/gestion"):
+                return self.send(200, json.dumps(gestion_datos(), ensure_ascii=False).encode(),
+                                 "application/json; charset=utf-8", {"Cache-Control": "no-store"})
             if p.startswith("/api/territorio.xlsx"):
                 return self.send(200, territorio_xlsx(),
                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -328,25 +286,26 @@ class H(BaseHTTPRequestHandler):
             if p.startswith("/api/territorio"):
                 return self.send(200, json.dumps(territorio_datos(), ensure_ascii=False).encode(),
                                  "application/json; charset=utf-8", {"Cache-Control": "no-store"})
-            if p.rstrip("/") in ("/trabajo", "/trabajo.html"):
+            ruta_html = p.split("?")[0].split("#")[0].rstrip("/")
+            if ruta_html in ("/gestion", "/gestion.html"):
+                return self.send(200, pagina("gestion.html"), "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
+            if ruta_html in ("/trabajo", "/trabajo.html"):
+                return self.send(301, b"", "text/plain", {"Location": "/"})
+            if ruta_html in ("", "/index.html"):
                 return self.send(200, pagina("trabajo.html"), "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
             ruta = p.split("?")[0]
             if ruta in ESTATICOS:
-                # MapLibre no cambia: se guarda un día. filtro.js / tooltip.js sí cambian: siempre frescos
                 cache = "public, max-age=86400" if ruta.startswith("/vendor/") else "no-cache"
                 return self.send(200, (ROOT / ruta[1:]).read_bytes(), ESTATICOS[ruta], {"Cache-Control": cache})
             if ruta.startswith("/src/"):
                 return self.archivo_src(ruta)
-            if p in ("/", "/index.html"):
-                return self.send(200, pagina("index.html"), "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
             self.send(404, b"not found", "text/plain")
         except Exception as e:
             print(f"Error en {p}: {e!r}")
             self.send(500, str(e).encode(), "text/plain")
 
     def archivo_src(self, ruta):
-        """Imágenes y archivos propios en la carpeta src/ (ej. /src/img/titulo.png).
-        Siempre se revalidan: si reemplazas la imagen, se ve la nueva al recargar."""
+        """Archivos de src/."""
         base = (ROOT / "src").resolve()
         f = (ROOT / urllib.parse.unquote(ruta).lstrip("/")).resolve()
         tipo = TIPOS_SRC.get(f.suffix.lower())
@@ -360,17 +319,19 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     if not TILE_DIR.exists() or not EXCEL.exists():
-        print("Aviso: faltan los datos locales. Descárgalos una vez con:  python descargar_todo.py")
+        print("Aviso: faltan tiles/ o datos.xlsx junto a server.py.")
     else:
         total, con_datos = resumen_tiles()
-        print(f"Modo local: {total} tiles ({con_datos} con datos) hasta zoom {zoom_maximo()}, "
-              "sin consultas al INEI.")
-        if not con_datos:
-            print("Aviso: todos los tiles están vacíos. Borra la carpeta cache_tiles y vuelve a "
-                  "correr  python descargar_todo.py")
-    if TILE_DIR.exists():  # deja calculadas las extensiones mientras abres el navegador
+        print(f"Mapa: {total} tiles ({con_datos} con datos) hasta zoom {zoom_maximo()}.")
         threading.Thread(target=extensiones, daemon=True).start()
         threading.Thread(target=precargar_tiles, daemon=True).start()
-    print(f"Mapa general:   http://localhost:{PORT}")
-    print(f"Mapa de trabajo: http://localhost:{PORT}/trabajo")
-    ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
+    print(f"Dashboard:              http://localhost:{PORT}/")
+    print(f"Gestión Administrativa: http://localhost:{PORT}/gestion")
+    try:
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            print(f"En la red:              http://{s.getsockname()[0]}:{PORT}/")
+    except OSError:
+        pass
+    ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()

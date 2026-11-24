@@ -1,12 +1,4 @@
-"""Datos del dashboard de la CSJ Junín, desde dashboard.xlsx (tablas planas, una fila por registro).
-
-- Magistrados -> un juez o jueza por fila: tarjetas, gráficos del resumen y burbujas por sede.
-- Organos     -> un órgano jurisdiccional por fila (tarjeta de órganos).
-- El resto de hojas (Poblacion, Carga_Procesal, Audiencias_*, Personal...) se envían tal cual y
-  el navegador hace las sumas, así los totales salen siempre de la misma fuente.
-
-Los nombres de provincia y distrito se cruzan con datos.xlsx (INEI) sin importar tildes ni Ñ.
-"""
+"""Lee dashboard.xlsx."""
 import datetime
 import re
 import unicodedata
@@ -33,7 +25,7 @@ def limpio(v):
 
 
 def leer_hojas(ruta):
-    """{hoja: [ {COLUMNA: valor}, ... ]}. Encabezado en la fila 1; se saltan filas vacías."""
+    """{hoja: [filas]}"""
     from openpyxl import load_workbook
     wb = load_workbook(ruta, read_only=True, data_only=True)
     out = {}
@@ -46,7 +38,7 @@ def leer_hojas(ruta):
 
 
 class Buscador:
-    """Nombre (+ departamento/provincia) -> id_geografia de datos.xlsx. Estricto: si no calza, None."""
+    """Nombre -> id_geografia, o None."""
 
     def __init__(self, datos):
         self.por_nivel = defaultdict(list)
@@ -61,7 +53,7 @@ class Buscador:
         exacto = [c[0] for c in cand if c[1] == n]
         if exacto:
             return exacto[0]
-        # 'SAN AGUSTIN DE CAJAS' vs 'SAN AGUSTIN': vale si es el único dentro de la misma provincia
+        # SAN AGUSTIN DE CAJAS = SAN AGUSTIN si es el unico en la provincia
         parecido = [c[0] for c in cand if c[1] and (n.startswith(c[1] + " ") or c[1].startswith(n + " "))]
         return parecido[0] if len(parecido) == 1 else None
 
@@ -80,13 +72,11 @@ def sumar(destino, m):
 
 
 def resumen(ruta, datos, cajas):
-    """{'tablas': {hoja: filas}, 'provincias': {id: {...}}, 'sedes': [...], 'csjj': {...}, 'avisos': [...]}"""
     tablas = leer_hojas(ruta)
     buscar = Buscador(datos)
     avisos = []
     vacio = lambda **k: dict({c: 0 for c in CAMPOS}, **k)
 
-    # Cada magistrado: id de su provincia y de su distrito (sede) en el mapa
     provincias, sedes, sin_ubicar = {}, {}, defaultdict(int)
     for m in tablas.get("Magistrados", []):
         dep, prov, sede = m.get("DEPARTAMENTO"), m.get("PROVINCIA"), m.get("SEDE_DISTRITO")
@@ -105,12 +95,11 @@ def resumen(ruta, datos, cajas):
     for m in tablas.get("Magistrados", []):
         sumar(csjj, m)
 
-    # Órganos: provincia y distrito en el mapa (para filtrar la tarjeta de órganos)
     for o in tablas.get("Organos", []):
         o["prov_id"] = buscar("8", o.get("PROVINCIA"), o.get("DEPARTAMENTO"))
         o["dist_id"] = buscar("9", o.get("DISTRITO"), o.get("DEPARTAMENTO"), o.get("PROVINCIA"))
 
-    # Burbujas: en el centro de su distrito (el mapa ya sabe dónde está cada distrito)
+    # burbujas por sede
     for did, s in sedes.items():
         c = cajas.get(did)
         if c:

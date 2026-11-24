@@ -1,8 +1,4 @@
-// =====================================================================================
-//  GRÁFICOS DEL DASHBOARD (Apache ECharts). Una función por pestaña.
-//  Los datos vienen de dashboard.xlsx (vía /api/jueces -> tablas) y aquí se suman.
-//  Colores: cámbialos en COLOR.
-// =====================================================================================
+// Graficos del dashboard
 (function () {
   const COLOR = {
     varon: '#0056a1', mujer: '#e8559a',
@@ -17,10 +13,8 @@
   const icono = (id, color) => `<svg class="ic" style="color:${color}"><use href="/iconos.svg#${id}"/></svg>`;
 
   const N = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
-  // números como el INEI: 1 074 · 49,4
   const fmt = n => (n == null || isNaN(n) ? '–' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 1 })
     .replace(/,/g, ' ').replace('.', ','));
-  // ejes: 1 200 000 -> "1.2 M", 35 000 -> "35 mil"
   const corto = v => Math.abs(v) >= 1e6 ? fmt(v / 1e6) + ' M' : Math.abs(v) >= 1e3 ? fmt(v / 1e3) + ' mil' : fmt(v);
   const num = v => (typeof v === 'number' ? v : parseFloat(v) || 0);
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -34,7 +28,7 @@
   const pintados = {};
   let tabActual = null;
 
-  // --- utilidades de ECharts ---
+  // echarts
   const BASE = {
     textStyle: { fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', color: SUAVE },
     animationDuration: 500,
@@ -45,11 +39,11 @@
     const el = $(id);
     if (!el) return null;
     let c = charts[id];
+    if (c && c.getDom() !== el) { c.dispose(); c = null; }  // el contenedor se volvió a crear (ej. mini gráficos)
     if (!c) {
       c = charts[id] = echarts.init(el);
       if (alClic) c.on('click', alClic);
     }
-    // estilo común: tooltip oscuro y barras con esquinas redondeadas (las apiladas, rectas)
     const op = Object.assign({}, BASE, opcion, { tooltip: Object.assign({}, TIP, opcion.tooltip) });
     const horizontal = !Array.isArray(op.yAxis) && op.yAxis?.type === 'category';
     const radio = horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0];
@@ -60,7 +54,7 @@
       if (!s.stack) s.itemStyle = Object.assign({ borderRadius: radio }, s.itemStyle);
       else { s.labelLayout = { hideOverlap: true }; (pilas[s.stack] = pilas[s.stack] || []).push(s); }
     }
-    // Barras apiladas: se redondea solo el tramo de arriba de cada columna (se ve como una sola barra)
+    // apiladas: solo se redondea el tramo de arriba
     for (const series of Object.values(pilas)) {
       const largo = Math.max(...series.map(s => (s.data || []).length));
       for (let i = 0; i < largo; i++) {
@@ -81,13 +75,12 @@
     splitLine: { lineStyle: { color: REJILLA } }, axisLine: { show: false } }, extra);
   const ejeCat = (datos, extra) => Object.assign({ type: 'category', data: datos, axisLabel: { fontSize: 12, color: SUAVE },
     axisTick: { show: false }, axisLine: { lineStyle: { color: '#e5e7eb' } } }, extra);
-  // Dona al estilo INEI: anillo grueso, separaciones, sin textos encima (la leyenda va debajo, en HTML)
+  // dona
   const dona = (datos, extra) => Object.assign({
     type: 'pie', radius: ['60%', '88%'], center: ['50%', '50%'], padAngle: 2.5,
     itemStyle: { borderRadius: 6 }, label: { show: false }, labelLine: { show: false },
     emphasis: { scale: true, scaleSize: 4 }, data: datos,
   }, extra);
-  // Leyenda debajo de la dona: ícono (o color), nombre, número grande y porcentaje
   function leyendaDona(id, items) {
     const el = $(id + '-ley');
     if (!el) return;
@@ -97,7 +90,7 @@
   }
   const tipDona = { trigger: 'item', formatter: p => `<b>${esc(p.name)}</b><br>${fmt(p.value)} · ${fmt(p.percent)}%` };
 
-  // --- filtro por zona del mapa ---
+  // filtro por zona
   const enSel = r => !sel || (sel[0] === '7' ? String(r.prov_id || '').slice(1, 3) === sel.slice(1, 3)
                             : sel[0] === '8' ? r.prov_id === sel : r.dist_id === sel);
   const esVaron = r => N(r.SEXO).startsWith('VAR');
@@ -107,7 +100,6 @@
   const INST = ['J. ESP.', 'SALA', 'JPL'];
 
   function provincias() {
-    // provincias con jueces, de mayor a menor
     const m = T.Magistrados || [];
     const ps = unicos(m.map(r => r.PROVINCIA)).map(nombre => {
       const filas = m.filter(r => r.PROVINCIA === nombre);
@@ -115,16 +107,14 @@
     });
     return ps.sort((a, b) => b.filas.length - a.filas.length);
   }
-  // ¿la provincia contiene la zona elegida? (para atenuar las demás barras)
   const resaltada = p => !sel || p.filas.some(enSel);
   const barra = (v, p, color) => ({ value: v, itemStyle: { color, opacity: resaltada(p) ? 1 : 0.25 } });
 
-  // ================= Tarjetas de arriba =================
+  // tarjetas
   function kpis(nombreSel) {
     const m = (T.Magistrados || []).filter(enSel), o = (T.Organos || []).filter(enSel);
     const set = (id, v) => { const e = $(id); if (e) e.textContent = typeof v === 'number' ? fmt(v) : v; };
     set('k-total', m.length); set('k-organos', o.length);
-    // cada tarjeta: número, % del total y barra
     const parte = (id, n) => {
       const p = m.length ? n / m.length * 100 : 0;
       set('k-' + id, n); set('k-' + id + '-p', fmt(p) + '%');
@@ -138,7 +128,7 @@
     if (f) { f.hidden = !sel; set('k-sel', nombreSel || ''); }
   }
 
-  // ================= 1) Proyecciones poblacionales =================
+  // proyecciones
   function pintarPoblacion() {
     const P = T.Poblacion || [];
     if (!P.length) return;
@@ -152,25 +142,26 @@
     const total = r => num(r.VARONES) + num(r.MUJERES);
     const provs = unicos(P.map(r => r.PROVINCIA));
     const pobDe = (p, a) => P.filter(r => r.PROVINCIA === p && r['AÑO'] === a).reduce((s, r) => s + total(r), 0);
+    // mismo color por provincia en todos los graficos
+    const fijo = provs.slice().sort((a, b) => pobDe(b, anios[0]) - pobDe(a, anios[0]));
+    const colorDe = p => PALETA[fijo.indexOf(p) % PALETA.length];
     provs.sort((a, b) => pobDe(b, anio) - pobDe(a, anio));
 
-    // Área apilada: población total proyectada por provincia
     grafico('c-pob-area', {
-      color: PALETA, tooltip: { trigger: 'axis', valueFormatter: fmt },
+      tooltip: { trigger: 'axis', valueFormatter: fmt },
       legend: leyenda(), grid: rejilla({ top: 58 }),
       xAxis: ejeCat(anios, { boundaryGap: false }), yAxis: ejeNum(),
-      series: provs.slice().reverse().map(p => ({ name: p, type: 'line', stack: 'pob', areaStyle: { opacity: 0.85 },
+      series: provs.slice().reverse().map(p => ({ name: p, type: 'line', stack: 'pob', color: colorDe(p), areaStyle: { opacity: 0.85 },
         symbol: 'none', lineStyle: { width: 1 }, data: anios.map(a => pobDe(p, a)) })),
     });
-    // Barras: población por provincia en el año elegido
     const asc = provs.slice().reverse();
     grafico('c-pob-barras', {
       tooltip: { trigger: 'axis', valueFormatter: fmt }, grid: rejilla({ top: 8, right: 60 }),
       xAxis: ejeNum(), yAxis: ejeCat(asc),
-      series: [{ type: 'bar', barWidth: '62%', data: asc.map((p, i) => ({ value: pobDe(p, anio), itemStyle: { color: PALETA[(provs.length - 1 - i) % PALETA.length] } })),
+      series: [{ type: 'bar', barWidth: '62%', data: asc.map(p => ({ value: pobDe(p, anio), itemStyle: { color: colorDe(p) } })),
         label: { show: true, position: 'right', formatter: p => fmt(p.value), fontSize: 11 } }],
     });
-    // Jueces por cada 100 mil habitantes
+    // jueces por 100 mil hab.
     const M = T.Magistrados || [];
     const filas = provs.map(p => {
       const j = M.filter(r => N(r.PROVINCIA) === N(p)).length, pob = pobDe(p, anio);
@@ -188,7 +179,6 @@
       series: [{ type: 'bar', barWidth: '62%', data: filas.map(f => ({ value: +f.valor.toFixed(1), itemStyle: { color: f.ref ? COLOR.granate : '#1e88e5' } })),
         label: { show: true, position: 'right', fontSize: 11, formatter: p => fmt(p.value) } }],
     });
-    // Mini gráficos: varones y mujeres por provincia
     const cont = $('pob-mini');
     if (cont && cont.dataset.provs !== provs.join('|')) {
       cont.dataset.provs = provs.join('|');
@@ -207,7 +197,7 @@
     });
   }
 
-  // ================= 2) Resumen y detalle por provincia =================
+  // resumen por provincia
   function pintarResumen() {
     const todos = T.Magistrados || [], m = todos.filter(enSel), ps = provincias();
     const nombres = ps.map(p => p.nombre);
@@ -229,7 +219,7 @@
     grafico('c-genero', { tooltip: tipDona, series: [dona(sexo.map(x => ({ name: x.name, value: x.value, itemStyle: { color: x.color } })))] });
     leyendaDona('c-genero', sexo);
 
-    // Por instancia: una barra por instancia con número y porcentaje encima (detalle por sexo en el tooltip)
+    // por instancia
     const colInst = { 'SALA': COLOR.sala, 'J. ESP.': COLOR.jesp, 'JPL': COLOR.jpl };
     const nomInst = { 'J. ESP.': 'Juzgados\nespecializados', 'SALA': 'Salas', 'JPL': 'Juzgados de\npaz letrado' };
     const porInst = INST.map(i => m.filter(r => inst(r) === i));
@@ -289,7 +279,7 @@
     }
   }
 
-  // ================= 3) Carga procesal =================
+  // carga procesal
   function pintarCarga() {
     const C = T.Carga_Procesal || [];
     const anios = unicos(C.map(r => r['AÑO'])).sort();
@@ -325,7 +315,7 @@
       series: esps.map(e => Object.assign({ name: e, connectNulls: false,
         data: anios.map(a => { const i = suma(a, 'INGRESOS', e); return i ? +(suma(a, 'RESUELTOS', e) / i * 100).toFixed(1) : null; }) }, lin)),
     });
-    // Sobrecarga: % por encima de la carga máxima
+    // sobrecarga
     const S = (T.Sobrecarga || []).map(r => ({ nombre: r.ORGANO_JURISDICCIONAL, max: num(r.CARGA_MAXIMA), proy: num(r.CARGA_PROYECTADA) }))
       .map(r => Object.assign(r, { pct: r.max ? (r.proy / r.max - 1) * 100 : 0 })).sort((a, b) => a.pct - b.pct);
     const corto = s => String(s).replace(/JUZGADO/g, 'J.').replace(/INVESTIGACI[OÓ]N PREPARATORIA/g, 'INV. PREP.')
@@ -340,7 +330,7 @@
     });
   }
 
-  // ================= 4) Audiencias =================
+  // audiencias
   function pintarAudiencias() {
     const A = T.Audiencias_NCPP || [], B = T.Audiencias_SNEJ || [];
     const anios = unicos([...A, ...B].map(r => r['AÑO'])).sort();
@@ -393,7 +383,7 @@
     }
   }
 
-  // ================= 5) Personal jurisdiccional =================
+  // personal
   const REGIMENES = [
     { n: 'D.L. 728', cols: ['DL_728'], c: '#0056a1' },
     { n: 'D.L. 1057 (CAS)', cols: ['CAS', 'RECAS'], c: '#f59e0b' },
@@ -452,7 +442,6 @@
       kpis();
       if (tabActual) mostrar(tabActual);
     },
-    // zona elegida en el mapa (o null): filtra tarjetas y la pestaña de resumen
     filtrar(gid, nombre) {
       sel = gid || null;
       kpis(nombre);

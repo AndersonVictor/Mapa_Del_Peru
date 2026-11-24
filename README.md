@@ -1,80 +1,77 @@
-# Mapa_Del_Peru
+# Tukuy Rikuy - Dashboard CSJ Junín
 
-Mapa del Censo 2025 (INEI) por departamento, provincia y distrito, **100% local**:
-se descarga todo una sola vez y después el mapa no consulta al INEI.
+Dashboard de la Corte Superior de Justicia de Junín con el mapa del territorio (Junín y Huancavelica)
+y el apartado de Gestión Administrativa.
 
-## Uso
+## Arquitectura
+
+La aplicación tiene tres capas y no usa base de datos.
 
 ```
-pip install openpyxl
-python descargar_todo.py     # UNA sola vez (tiles + datos.xlsx). Se puede cortar y reanudar.
-python server.py             # abre http://localhost:8000
+Navegador (HTML + JS)  ->  server.py (Python)  ->  Excel (.xlsx) + tiles/
 ```
 
-- `descargar_todo.py` baja los tiles hasta zoom 10 (~2 800 archivos) a `cache_tiles/`
-  y los textos de ~2 100 departamentos/provincias/distritos a `datos.xlsx`.
-  Va despacio a propósito para no cargar el servidor del INEI.
-  Con `--zoom 11` baja más detalle en los bordes (~11 000 tiles).
-- `server.py` solo lee esos archivos. Si acercas más que el zoom descargado, el mapa
-  amplía los mismos tiles. La librería del mapa (MapLibre) también está en `vendor/`,
-  así que funciona incluso sin internet.
+- **Frontend:** páginas HTML estáticas con JavaScript sin framework. Los gráficos usan ECharts y el mapa usa MapLibre GL. Las dos librerías están en `vendor/`, así que no se carga nada desde un CDN.
+- **Backend:** `server.py` usa solo la librería estándar de Python (`http.server`). Sirve las páginas y una API JSON (`/api/jueces`, `/api/gestion`, `/api/territorio`, `/api/datos`). Cada vez que se pide un dato, lee los Excel.
+- **Datos:** los Excel son la fuente de datos; no hay base de datos. El mapa base son tiles vectoriales del INEI de Junín y Huancavelica, que vienen en `tiles/` (unos 20 MB). No necesita internet.
 
-## Navegar
+| Archivo | Responsabilidad |
+|---|---|
+| `server.py` | servidor HTTP y rutas |
+| `jueces.py` | magistrados, órganos, carga y población |
+| `territorio.py` | competencia territorial |
+| `geo.py` | lectura de los tiles (extensión de cada zona) |
+| `gestion.py` | indicadores de Gestión Administrativa |
+| `trabajo.html`, `graficos.js` | dashboard principal |
+| `gestion.html`, `gestion.js` | Gestión Administrativa |
+| `filtro.js`, `tooltip.js` | mapa y tooltip |
 
-- **Clic** en una zona = acercarse a ella, como en el INEI: departamento → sus provincias → sus distritos.
-- Botón **⟲ Perú** (arriba a la izquierda) = volver a ver todo el país.
+## Requisitos
 
-- **Combos Departamento → Provincia → Distrito** (arriba a la izquierda): eligen una zona, la marcan en azul y acercan el mapa.
-- **Nombres en el mapa**: sin elegir nada se ven los departamentos; al elegir un departamento aparecen los nombres de sus provincias; al elegir una provincia,
-  los de sus distritos (el distrito elegido en azul). Si dos nombres se tapan, se oculta el de la zona más chica
-  y reaparece al acercar. En el mapa de trabajo se ven las provincias desde el inicio.
+- Python 3.10 o superior (probado con 3.14).
+- `openpyxl`.
+- El puerto 8000 libre.
 
-## Mapa de trabajo: Junín y Huancavelica (http://localhost:8000/trabajo)
+## Instalación
 
-### Territorio del mapa: `competencias.xlsx`
+```
+pip install -r requirements.txt
+python server.py
+```
 
-El mapa de trabajo dibuja solo el territorio que la Corte atiende, leído de la columna
-**"Competencia (Territorial)"** de `competencias.xlsx` (una fila por órgano jurisdiccional):
+## Despliegue en subdominio
 
-- "PROVINCIA(S) DE A, B Y C" → esas provincias completas.
-- "DISTRITO(S) DE X, Y Y Z" → solo esos distritos (ej. Chinchihuasi, Paucarbamba y Pachamarca de Churcampa).
-- Entiende alias (La Oroya = Yauli, Pampas = Tayacaja, Cajas = San Agustín), aclaraciones como
-  "(PROVINCIA DE CHURCAMPA)" o "DE LA PROVINCIA DE TAYACAJA", y corrige errores de tipeo.
-- Un distrito con nombre repetido (Palca, Acobamba...) se busca primero en la provincia de la sede del órgano.
-- Junín y Huancavelica se dibujan completos: los distritos **sin competencia territorial** van en gris
-  rayado (con su nombre apagado y un aviso en el tooltip) y no se pueden filtrar.
-- Lo que no reconozca aparece en "Revisar" del panel. Edita el Excel, guarda y recarga (F5).
+`server.py` escucha en `0.0.0.0:8000`. En producción va detrás de un proxy inverso (IIS, Nginx o Apache), que atiende el subdominio con HTTPS y reenvía las peticiones a `http://localhost:8000`. Las rutas son absolutas desde `/`, por eso el subdominio debe apuntar a la raíz y no a una subcarpeta.
 
-### Dashboard de la CSJ Junín (5 pestañas) — datos en `dashboard.xlsx`
+Para que siga activo cuando se reinicia el equipo, `python server.py` se registra como servicio, por ejemplo con NSSM o el Programador de tareas en Windows.
 
-`http://localhost:8000/trabajo` es un dashboard con gráficos ECharts (`vendor/echarts.min.js`, funciona sin internet):
+## Rutas
 
-1. **Proyecciones poblacionales**: población proyectada por provincia, población del año elegido,
-   jueces por 100 mil habitantes (con el total de la Corte y la referencia nacional) y varones/mujeres por provincia.
-2. **Resumen y detalle por provincia**: el mapa con los combos. Al elegir una zona (combo, clic en el mapa o en una
-   barra) las tarjetas, las donas de género y condición, las barras por instancia y la tabla de jueces muestran
-   solo esa zona. "✕ Ver toda la Corte" quita el filtro.
-3. **Carga procesal**: carga/ingresos/resueltos por año, resueltos por especialidad, carga acumulada (%),
-   ingresos, tasa de resolución y órganos con sobrecarga.
-4. **Audiencias**: NCPP por sede y SNEJ por juzgado (programadas, tasa de atención, acumulado y tasa del año elegido).
-5. **Personal jurisdiccional**: total, régimen laboral, cargos con más personal y tabla de todos los cargos.
+| Ruta | Página |
+|---|---|
+| `/` | Dashboard |
+| `/gestion` | Gestión Administrativa |
+| `/trabajo` | redirige a `/` |
 
-`dashboard.xlsx` tiene una hoja por tema, todas planas (una fila por registro, sin títulos ni totales; el dashboard
-suma solo). Su hoja `LEEME` explica cada hoja. Edita, guarda y recarga la página (F5).
-Los colores de los gráficos están al inicio de `graficos.js` (`COLOR`). Los íconos (SVG) están en `iconos.svg`:
-se usan con `<svg class="ic"><use href="/iconos.svg#mazo"/></svg>` y toman el color del texto.
-El tooltip del mapa (oscuro, estilo INEI) se personaliza al inicio de `tooltip.js`.
+## Archivos de datos
 
-## Editar los textos del tooltip (datos.xlsx)
+- `dashboard.xlsx`: magistrados, órganos, población, carga procesal, audiencias y personal. La hoja `LEEME` explica cada hoja.
+- `competencias.xlsx`: competencia territorial de cada órgano. Define qué provincias y distritos se dibujan en el mapa. Los distritos que la Corte no ve aunque su provincia figure completa (hoy Monobamba) van en `EXCLUIDOS` de `territorio.py`.
+- `gestion_administrativa.xlsx`: indicadores de Gestión Administrativa. Se crea con `python crear_gestion.py`
+  (`--todo` lo vuelve a crear desde cero).
+- `datos.xlsx`: nombres y población de cada departamento, provincia y distrito de Junín y Huancavelica (tooltip del mapa). No cambiar `id_geografia` ni los encabezados.
+- `proyeccion_poblacion.xlsx`: cálculo de la proyección 2026-2031 con los censos 2017 y 2025. Es de consulta, el servidor no lo lee.
 
-- Una fila por departamento (id 7…), provincia (id 8…) y distrito (id 9…).
-- Columnas: `nombregion`, `nombprov`, `nombdist`, `nombAmbito`, `indicador`, `dato`, `hombre`, `mujer`, `densidad`.
-- No cambies la columna `id_geografia` ni los encabezados.
-- Edita, guarda y **recarga la página** (F5): no hace falta reiniciar el servidor.
-- `python actualizar_excel.py` agrega solo las filas que falten (no toca lo que editaste).
-  `python actualizar_excel.py --todo` lo vuelve a bajar todo y sobrescribe tus cambios.
-- **Columnas nuevas**: agrega una columna a `datos.xlsx` (el encabezado es el texto que se muestra)
-  y aparece sola en el tooltip de ambos mapas y en la descarga a Excel. `actualizar_excel.py` la conserva.
-  Las celdas vacías no se muestran.
-- **Personalizar el tooltip** (colores, textos, orden, ocultar filas): todo está al inicio de `tooltip.js`.
-- Cierra el Excel antes de correr los scripts (Windows no deja guardar un archivo abierto).
+Después de editar un Excel basta con guardar y recargar la página (F5). Cerrar el Excel antes de correr los scripts.
+
+## Gestión Administrativa
+
+- Se muestra el último corte validado de cada indicador.
+- Los años incompletos llevan la etiqueta *parcial*.
+- Si hay cifras observadas aparece la pestaña *Cifras por validar*; si todo está validado, el servidor no la envía.
+
+## Personalizar
+
+- Colores de los gráficos: `COLOR` en `graficos.js`.
+- Tooltip del mapa: inicio de `tooltip.js`.
+- Íconos: `iconos.svg`.
